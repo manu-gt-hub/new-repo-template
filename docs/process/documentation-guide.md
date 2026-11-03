@@ -37,6 +37,8 @@ Navigation is generated from the folders: a new page appears automatically in it
 
 All of them are produced by one command, `python .harness/scripts/build_docs.py`. Never edit them by hand. The **pre-commit hook runs it automatically** when a commit touches `docs/` or the feature list, and adds them to the commit. The harness self-test and CI fail if they are out of date. It uses only the Python standard library.
 
+They **never cause merge conflicts**: a merge driver (set up by `init.sh`, see `.gitattributes`) keeps one side, and the hooks rebuild them from the merged `docs/` (`post-merge` for a clean merge, `pre-commit` when you finish a merge that had other conflicts). Rebases replay commits without hooks: if `post-rewrite` warns that the docs are stale, run `python .harness/scripts/build_docs.py` and commit. Pull requests that GitHub reports as conflicting only on these files are fixed by merging `main` locally.
+
 ## Useful syntax
 
 ````markdown

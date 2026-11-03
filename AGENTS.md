@@ -1,6 +1,6 @@
 # AGENTS.md — Entry point for AI agents
 
-This file is the **single source of truth** for how any AI agent (Claude Code, Cursor, Copilot, Codex, etc.) must behave in this repository. `CLAUDE.md` and `.cursorrules` point here. Read it fully before doing anything.
+This file is the **single source of truth** for how any AI agent (Claude Code, Cursor, Copilot, Codex, etc.) must behave in this repository. `CLAUDE.md`, `.cursorrules` and `.github/copilot-instructions.md` point here (Codex and current Cursor/Copilot read this file directly). Read it fully before doing anything.
 
 ---
 
@@ -9,7 +9,7 @@ This file is the **single source of truth** for how any AI agent (Claude Code, C
 | Situation | What to do |
 |---|---|
 | The user asks you to **create a new project using this repo as a template** | Follow [BOOTSTRAP.md](BOOTSTRAP.md) step by step. Do not improvise. |
-| `BOOTSTRAP.md` exists and the user asks you to **change the template itself** | You are maintaining the template. The `TODO` placeholders are intentional; keep everything generic and stack-agnostic, and run `bash tests/harness/run.sh` after changes. |
+| `BOOTSTRAP.md` exists and the user asks you to **change the template itself** | You are maintaining the template. The `TODO` placeholders are intentional; keep everything generic and stack-agnostic, and run `bash tests/harness/run.sh` after changes. Rule 8 is relaxed here: a GitHub issue is optional and branches are `<type>/<slug>` (e.g. `feat/kanban-board`). |
 | `.harness/state/` does **not** exist, or [docs/project-context/PROJECT_CONTEXT.md](docs/project-context/PROJECT_CONTEXT.md) still contains `TODO` placeholders | The project is **not initialized**. Stop and tell the user. Offer to run the discovery phase from [BOOTSTRAP.md](BOOTSTRAP.md#phase-1--discovery). |
 | The project is initialized | Follow the **Session workflow** (section 3) below. |
 
@@ -41,7 +41,7 @@ The repository holds **everything** about the project: the **code** (`src/`, `te
 AGENTS.md                      ← you are here (rules + map)
 docs-site/                     ← GENERATED documentation site (index.html + Cloudflare files). Never edit by hand.
 src/                           ← application code (created by the first foundation task)
-CLAUDE.md / .cursorrules       ← tool-specific pointers to this file
+CLAUDE.md / .cursorrules / .github/copilot-instructions.md ← tool-specific pointers to this file
 BOOTSTRAP.md                   ← procedure to create a new project from this template
 .harness/
   templates/                   ← blank templates (do not edit per-session; copy instead)
@@ -54,6 +54,7 @@ BOOTSTRAP.md                   ← procedure to create a new project from this t
   hooks/pre-agent.sh           ← runs at session start (context + sanity checks)
   hooks/post-agent.sh          ← runs at session end (validation)
   scripts/preflight.sh         ← checks tools, gh login/scopes and repo access; prints install/fix commands
+  scripts/verify_bootstrap.sh  ← acceptance check of a generated project (must PASS before bootstrap is done)
   scripts/create_issues.py     ← creates GitHub labels/milestones/issues + Kanban board from a backlog JSON
   scripts/apply_ruleset.sh     ← creates/updates the GitHub ruleset from .github/rulesets/main.json
   scripts/build_docs.py        ← generates docs/backlog/index.md + docs-site/ (stdlib only; run by pre-commit)
@@ -100,7 +101,7 @@ tests/                         ← mandatory verification system (success criter
 ## 3. Session workflow
 
 ### 3.1 Start of session
-1. Run (or let the hook run) `bash .harness/hooks/pre-agent.sh`.
+1. Run (or let the hook run) `bash .harness/hooks/pre-agent.sh`. Only Claude Code runs it automatically; with any other tool, run it yourself.
 2. Read, in this order:
    - `.harness/state/session-handoff.md` — what the previous session left for you.
    - `.harness/state/claude-progress.md` — last entries only.
@@ -110,7 +111,7 @@ tests/                         ← mandatory verification system (success criter
 
 ### 3.2 Before writing code
 1. Read the issue. Check it against the [Definition of Ready](docs/process/definition-of-ready.md). If it fails, list what is missing and ask the user — do not start.
-2. Create a branch: `<type>/<issue-number>-<short-slug>` (e.g. `feat/42-user-login`).
+2. Create a branch: `<type>/<issue-number>-<short-slug>` (e.g. `feat/42-user-login`), and mark the item started: `python .harness/scripts/create_issues.py --set-status <KEY> in_progress`.
 3. Share a short plan (files to touch, approach, tests to add). For anything non-trivial, wait for approval.
 
 ### 3.3 While working
@@ -119,7 +120,7 @@ tests/                         ← mandatory verification system (success criter
 - Respect the constraints in PROJECT_CONTEXT (data location, security, access control, cost limits, UI guidelines).
 - Record significant technical decisions as an ADR in `docs/architecture/decisions/NNNN-title.md` (copy `docs/resources/templates/adr-template.md`).
 - **Keep docs in sync in the same change**: if behaviour, scope, roles, user flows, costs or architecture change, update the matching page (`docs/business/*` in plain language, `docs/architecture/*` technically). Follow [documentation-guide.md](docs/process/documentation-guide.md).
-- **Backlog changes**: new or changed work items go into `docs/backlog/backlog.json` (proposed to the user first). Run `create_issues.py` to sync GitHub (after confirmation), then `python .harness/scripts/build_docs.py`.
+- **Backlog changes**: new or changed work items go into `docs/backlog/backlog.json` (proposed to the user first). After confirmation, sync GitHub with `python .harness/scripts/create_issues.py --update --write-feature-list .harness/state/feature_list.json` (creates new items, rewrites changed ones, never duplicates; `--dry-run` first).
 
 ### 3.4 Before committing
 - Run `LINT_CMD`, `FORMAT_CHECK_CMD`, `TYPECHECK_CMD` and `TEST_CMD` from `sandbox.config`. Fix failures; do not disable rules or skip tests to get green.
@@ -128,7 +129,7 @@ tests/                         ← mandatory verification system (success criter
 ### 3.5 Before saying "done"
 - Walk through `.harness/templates/clean-state-checklist.md` and the [Definition of Done](docs/process/definition-of-done.md). Report each item honestly.
 - Open a PR using the PR template (only if the user asked you to, or the workflow in PROJECT_CONTEXT says so). Link it with `Closes #<n>`.
-- Update `feature_list.json` status and regenerate the docs: `python .harness/scripts/build_docs.py` (pre-commit also does it).
+- Status is updated through `python .harness/scripts/create_issues.py --set-status <KEY> <status>` (see section 4); the pre-commit hook regenerates the docs.
 
 ### 3.6 End of session (always)
 1. Append an entry to `.harness/state/claude-progress.md`.
@@ -143,6 +144,8 @@ tests/                         ← mandatory verification system (success criter
 |---|---|---|
 | `docs/backlog/backlog.json` | agent (with user approval) | a work item is added, split or redefined |
 | `.harness/state/feature_list.json` | agent + user | a feature changes status, a new issue is created, a milestone moves |
+
+**Status has one source of truth: GitHub.** A closed issue is `done`; an open issue takes its Kanban board column. `pre-agent.sh` pulls this into `feature_list.json` at every session start (`--sync-status`). Never edit a `status` by hand: run `python .harness/scripts/create_issues.py --set-status <KEY> <todo|in_progress|blocked|in_review|done>`, which updates the feature list **and** moves the card on the board. Set `in_progress` when you start an issue (section 3.2) and `in_review` when its PR is open; merging the PR with `Closes #N` makes it `done`.
 | `docs/backlog/index.md` | generated | after any change to the two files above (`build_docs.py`) |
 | `.harness/state/claude-progress.md` | agent | end of each session or meaningful step (append-only, newest at top) |
 | `.harness/state/session-handoff.md` | agent | end of each session (overwrite) |

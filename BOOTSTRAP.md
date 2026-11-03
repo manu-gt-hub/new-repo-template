@@ -179,7 +179,18 @@ Then, inside `$WORK/target`:
    bash .harness/scripts/apply_ruleset.sh <owner>/<new-repo> --dry-run
    ```
    **Checkpoint 5:** after confirmation, run it without `--dry-run`. Also set `.github/CODEOWNERS` to the project owner(s) (ask; default: the user). If the API answers 403/404 on a private repo, rulesets need GitHub Pro/Team: tell the user and skip.
-3. Report to the user:
+   In the same checkpoint, switch on GitHub **secret scanning and push protection** (GitHub blocks pushes that contain known token formats, a stronger net than the local regex in `sandbox.config`):
+   ```bash
+   echo '{"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"}}}' \
+     | gh api -X PATCH repos/<owner>/<new-repo> --input - >/dev/null
+   ```
+   Free on public repositories. On private ones it needs GitHub Secret Protection; if the API refuses, tell the user and skip.
+3. **Acceptance check (mandatory).** In `$WORK/target`, run:
+   ```bash
+   bash .harness/scripts/verify_bootstrap.sh
+   ```
+   It checks template leftovers, `TODO`s, state files, hooks, backlog, docs, language, issues, the Kanban board, the ruleset and that everything is pushed. Fix every `[FAIL]` and re-run until it prints `PASS`. **Do not report the bootstrap as done before that**; if something cannot be fixed (for example the ruleset on a free private repo), tell the user exactly which check and why.
+4. Report to the user:
    - target repo URL and commit SHA(s),
    - how to view the documentation: double-click `docs-site/index.html`, or publish it online (`docs/process/documentation-guide.md`, section *Publishing online*). Ask which option they want: **GitHub Pages** (public; you can switch it on with its two commands after their yes) or **Cloudflare Pages** (private; walk them through it). Do not publish anything without explicit permission,
    - number of issues/milestones created with links,
@@ -187,12 +198,12 @@ Then, inside `$WORK/target`:
    - suggested first issue to start with,
    - whether the ruleset was applied (link to `https://github.com/<owner>/<new-repo>/rules`),
    - the remaining manual steps from the Phase 0 list (auto-add workflow on the board, CI secrets, docs publishing if not done).
-4. Delete `$WORK` only after the user confirms everything is in place.
+5. Delete `$WORK` only after the user confirms everything is in place.
 
 ---
 
 ## Failure handling
 
 - If any step fails, stop, show the exact error, and propose a fix. Do not continue to the next phase.
-- `create_issues.py` is idempotent by title: re-running it skips issues whose exact title already exists. Use this to resume a partial run.
+- `create_issues.py` is idempotent: it finds existing issues by backlog key (or exact title) and skips them, and reuses the board. Use this to resume a partial run.
 - Never delete issues or force-push to recover; ask the user.

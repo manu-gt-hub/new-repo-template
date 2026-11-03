@@ -27,8 +27,15 @@ to the repo (Projects tab), adds every backlog issue (new ones in the Todo colum
 Board view with one column per Status. This needs the token scope `project`
 (`gh auth refresh -s project`). Use --project-title to rename it, or --no-project to skip it.
 
-Idempotent: issues whose exact title already exists in the repo are reused, not duplicated;
-the project, its items and the view are reused too, so re-running adds only what is missing.
+Idempotent: an existing issue is found by its backlog key (the "Backlog key" footer of its body)
+or, failing that, by exact title, and reused instead of duplicated; renaming an item does not
+create a new issue. Existing issues are left as they are unless you pass --update, which
+rewrites their title, body, milestone and labels from the backlog. The project, its items and
+the view are reused too, so re-running adds only what is missing.
+
+Status (GitHub is the source of truth; see AGENTS.md section 4):
+    python .harness/scripts/create_issues.py --sync-status            # pull issue states + board columns
+    python .harness/scripts/create_issues.py --set-status US-001 in_progress   # feature list + board card
 """
 from __future__ import annotations
 
@@ -36,6 +43,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -223,6 +231,23 @@ def issue_title(item: dict[str, Any]) -> str:
     return f"[{TYPES[item['type']]}] {item['title']}"
 
 
+MANAGED_LABEL_PREFIXES = ("type", "priority", "size", "area")
+KEY_RE = re.compile(r"Backlog key: `([^`]+)`")
+
+
+def match_existing(issues: list[dict[str, Any]]) -> tuple[dict[str, int], dict[str, int]]:
+    """Index existing issues by backlog key (from the body footer) and by exact title.
+    The key wins, so renaming an item in the backlog does not create a duplicate issue."""
+    by_key: dict[str, int] = {}
+    by_title: dict[str, int] = {}
+    for i in issues:
+        m = KEY_RE.search(i.get("body") or "")
+        if m:
+            by_key.setdefault(m.group(1), i["number"])
+        by_title.setdefault(i["title"], i["number"])
+    return by_key, by_title
+
+
 def labels_for(item: dict[str, Any]) -> list[str]:
     labels = [f"type:{item['type']}", f"priority:{item.get('priority', 'p2')}", size_label(item)]
     labels += [f"area:{a}" for a in item.get("area", [])]
@@ -289,10 +314,26 @@ class Gh:
         self.run(args)
         print(f"  milestone {'would be created' if self.dry_run else 'created'}: {m['title']}")
 
-    def existing_issues(self) -> dict[str, int]:
+    def existing_issues(self) -> list[dict[str, Any]]:
         out = self.run(["issue", "list", "--repo", self.repo, "--state", "all", "--limit", "2000",
-                        "--json", "number,title"], mutate=False)
-        return {i["title"]: i["number"] for i in json.loads(out or "[]")}
+                        "--json", "number,title,body,labels"], mutate=False)
+        return json.loads(out or "[]")
+
+    def update_issue(self, number: int, title: str, body: str, labels: list[str], milestone: str,
+                     current_labels: list[str]) -> None:
+        """Rewrite title/body/milestone; add missing labels and drop stale managed ones."""
+        stale = [lab for lab in current_labels if lab.split(":")[0] in MANAGED_LABEL_PREFIXES and lab not in labels]
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".md", encoding="utf-8") as fh:
+            fh.write(body)
+            path = fh.name
+        try:
+            args = ["issue", "edit", str(number), "--repo", self.repo, "--title", title, "--body-file", path,
+                    "--milestone", milestone, "--add-label", ",".join(labels)]
+            if stale:
+                args += ["--remove-label", ",".join(stale)]
+            self.run(args)
+        finally:
+            os.unlink(path)
 
     def create_issue(self, title: str, body: str, labels: list[str], milestone: str) -> int:
         with tempfile.NamedTemporaryFile("w", delete=False, suffix=".md", encoding="utf-8") as fh:
@@ -405,15 +446,31 @@ class Gh:
             os.unlink(path)
         print(f"  board view created: {name} (columns = Status)")
 
-    def status_todo(self, owner: str, number: int) -> tuple[str, str] | None:
-        """Return (field id, option id) of Status = Todo, if the project has it."""
+    def status_option(self, owner: str, number: int, status: str) -> tuple[str, str] | None:
+        """Return (field id, option id) of the board column for a feature status, if it exists."""
         out = self.run(["project", "field-list", str(number), "--owner", owner, "--format", "json"], mutate=False)
         for f in json.loads(out or "{}").get("fields", []):
             if f.get("name") == "Status":
                 for o in f.get("options", []):
-                    if o.get("name", "").lower() in ("todo", "to do"):
+                    if column_status(o.get("name", "")) == status:
                         return f["id"], o["id"]
         return None
+
+    def board_items(self, owner: str, number: int) -> dict[int, dict[str, str]]:
+        """issue number -> {'id': item id, 'status': column name} for this repo's issues."""
+        out = self.run(["project", "item-list", str(number), "--owner", owner, "--limit", "2000",
+                        "--format", "json"], mutate=False)
+        items = {}
+        for it in json.loads(out or "{}").get("items", []):
+            c = it.get("content") or {}
+            if c.get("type") == "Issue" and c.get("repository", self.repo) == self.repo:
+                items[int(c["number"])] = {"id": it.get("id", ""), "status": it.get("status") or ""}
+        return items
+
+    def issue_states(self) -> dict[int, str]:
+        out = self.run(["issue", "list", "--repo", self.repo, "--state", "all", "--limit", "2000",
+                        "--json", "number,state"], mutate=False)
+        return {i["number"]: i["state"] for i in json.loads(out or "[]")}
 
     def add_to_project(self, owner: str, number: int, issue: int) -> str:
         out = self.run(["project", "item-add", str(number), "--owner", owner, "--url",
@@ -438,7 +495,7 @@ class Gh:
                 print(f"  linked to {self.repo}")
             except RuntimeError as exc:  # already linked, or not permitted
                 print(f"  warn: could not link the project to {self.repo}: {exc}")
-            todo = self.status_todo(owner, num)
+            todo = self.status_option(owner, num, "todo")
             for key, issue in numbers.items():
                 item = self.add_to_project(owner, num, issue)
                 if todo and item and key in new_keys:
@@ -455,6 +512,99 @@ class Gh:
             print(f"  ERROR: project NOT set up: {exc}")
             print("  If the error mentions scopes, run: gh auth refresh -s project   (then re-run this script)")
             return False
+
+
+# --------------------------------------------------------------------------- status sync
+STATUSES = ("todo", "in_progress", "blocked", "in_review", "done")
+
+
+def column_status(column: str) -> str | None:
+    """Board column name -> feature status ('In Progress' -> in_progress, 'To do' -> todo)."""
+    s = column.strip().lower().replace(" ", "_").replace("-", "_")
+    s = {"to_do": "todo", "doing": "in_progress", "review": "in_review"}.get(s, s)
+    return s if s in STATUSES else None
+
+
+def synced_status(local: str, issue_state: str | None, column: str | None) -> str:
+    """GitHub is the source of truth: closed -> done; open -> its board column.
+    Local blocked/in_review refine an 'In Progress' column and are kept; a reopened issue
+    without a known column goes back to todo; otherwise the local status stays."""
+    if issue_state == "CLOSED":
+        return "done"
+    board = column_status(column or "")
+    if board == "in_progress" and local in ("blocked", "in_review"):
+        return local
+    if board:
+        return board
+    if issue_state == "OPEN" and local == "done":
+        return "todo"
+    return local
+
+
+def load_features(path: str) -> dict[str, Any]:
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def save_features(path: str, data: dict[str, Any]) -> None:
+    data["updated_at"] = dt.date.today().isoformat()
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(data, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+
+
+def sync_status(gh: "Gh", path: str, project_title: str) -> int:
+    """Pull issue states and board columns into feature_list.json (read-only on GitHub)."""
+    data = load_features(path)
+    states = gh.issue_states()
+    owner = gh.repo.split("/")[0]
+    try:
+        project = gh.find_project(owner, project_title)
+        board = gh.board_items(owner, int(project["number"])) if project else {}
+    except RuntimeError as exc:  # e.g. token without the `project` scope
+        print(f"  warn: board not read ({str(exc).splitlines()[-1][:120]}); using issue states only")
+        project, board = None, {}
+    changed = 0
+    for f in data.get("features", []):
+        if not f.get("issue"):
+            continue
+        new = synced_status(f.get("status", "todo"), states.get(f["issue"]),
+                            board.get(f["issue"], {}).get("status"))
+        if new != f.get("status"):
+            print(f"  {f['key']} #{f['issue']}: {f.get('status')} -> {new}")
+            f["status"] = new
+            changed += 1
+    if changed:
+        save_features(path, data)
+    print(f"Status sync: {changed} change(s){'' if project else ' (no board found: issue states only)'}.")
+    return 0
+
+
+def set_status(gh: "Gh", path: str, project_title: str, key: str, status: str) -> int:
+    """Set a feature's status locally AND move its card on the board, so both stay in sync."""
+    data = load_features(path)
+    feat = next((f for f in data.get("features", []) if f.get("key") == key), None)
+    if not feat:
+        print(f"unknown feature key: {key}")
+        return 1
+    feat["status"] = status
+    save_features(path, data)
+    print(f"  {key}: status = {status} (feature list)")
+    owner = gh.repo.split("/")[0]
+    project = gh.find_project(owner, project_title) if feat.get("issue") else None
+    if not project:
+        print("  board not updated (no issue number or no board)")
+        return 0
+    num = int(project["number"])
+    item = gh.board_items(owner, num).get(feat["issue"])
+    option = gh.status_option(owner, num, status)
+    if item and option:
+        gh.run(["project", "item-edit", "--id", item["id"], "--project-id", project["id"],
+                "--field-id", option[0], "--single-select-option-id", option[1]])
+        print(f"  #{feat['issue']}: board column updated")
+    else:
+        print(f"  board not updated (issue not on the board or no column for '{status}'; blocked/in_review stay in 'In Progress')")
+    return 0
 
 
 # --------------------------------------------------------------------------- feature list
@@ -498,21 +648,48 @@ def write_feature_list(path: str, backlog: dict[str, Any], numbers: dict[str, in
 # --------------------------------------------------------------------------- main
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--backlog", required=True, help="path to backlog JSON")
-    ap.add_argument("--repo", help="owner/name of the target GitHub repository")
+    ap.add_argument("--backlog", default="docs/backlog/backlog.json", help="path to backlog JSON (default: %(default)s)")
+    ap.add_argument("--repo", help="owner/name of the target GitHub repository (default: 'repository' in the backlog)")
+    ap.add_argument("--sync-status", action="store_true",
+                    help="pull issue states and board columns into the feature list, then exit (read-only on GitHub)")
+    ap.add_argument("--set-status", nargs=2, metavar=("KEY", "STATUS"),
+                    help=f"set a feature's status in the feature list and on the board; STATUS: {', '.join(STATUSES)}")
+    ap.add_argument("--feature-list", default=".harness/state/feature_list.json",
+                    help="feature list used by --sync-status / --set-status (default: %(default)s)")
     ap.add_argument("--dry-run", action="store_true", help="print gh commands without executing mutations")
     ap.add_argument("--validate-only", action="store_true", help="validate the backlog and exit (no network)")
     ap.add_argument("--out", default="issue-map.json", help="where to write the key -> issue number map")
     ap.add_argument("--write-feature-list", metavar="PATH", help="write/update a harness feature_list.json")
     ap.add_argument("--no-relationships", action="store_true", help="skip GitHub 'blocked by' and sub-issue links")
+    ap.add_argument("--update", action="store_true",
+                    help="also rewrite title, body, milestone and labels of existing issues from the backlog")
     ap.add_argument("--project-title", default="Kanban board",
                     help="GitHub Project (board) to create or reuse, linked to the repo (default: %(default)s)")
     ap.add_argument("--project-view", default="Board", help="name of the board view (default: %(default)s)")
     ap.add_argument("--no-project", action="store_true", help="do not create/update the GitHub Project")
     args = ap.parse_args()
 
-    with open(args.backlog, encoding="utf-8") as fh:
-        backlog = json.load(fh)
+    backlog: dict[str, Any] = {}
+    if os.path.exists(args.backlog):
+        with open(args.backlog, encoding="utf-8") as fh:
+            backlog = json.load(fh)
+    args.repo = args.repo or backlog.get("repository") or None
+
+    if args.sync_status or args.set_status:
+        if not args.repo:
+            ap.error("--repo is required (or set 'repository' in the backlog)")
+        if args.set_status and args.set_status[1] not in STATUSES:
+            ap.error(f"STATUS must be one of: {', '.join(STATUSES)}")
+        gh = Gh(args.repo, dry_run=False)
+        try:
+            if args.set_status:
+                return set_status(gh, args.feature_list, args.project_title, *args.set_status)
+            return sync_status(gh, args.feature_list, args.project_title)
+        except (RuntimeError, OSError, ValueError) as exc:
+            print(f"Status sync failed: {exc}")
+            return 1
+    if not backlog:
+        ap.error(f"backlog not found: {args.backlog}")
 
     errors = validate(backlog)
     if errors:
@@ -546,14 +723,17 @@ def main() -> int:
         gh.ensure_milestone(m, existing_ms)
 
     print("\n== Issues ==")
-    existing = gh.existing_issues() if not args.dry_run else {}
+    issues = gh.existing_issues() if not args.dry_run else []
+    by_key, by_title = match_existing(issues)
+    labels_now = {i["number"]: [lab["name"] for lab in i.get("labels", [])] for i in issues}
     numbers: dict[str, int] = {}
     created: list[str] = []
     for n, item in enumerate(topo_order(items), 1):
         title = issue_title(item)
-        if title in existing:
-            numbers[item["key"]] = existing[title]
-            print(f"  exists  #{existing[title]:<5} {item['key']:<10} {title}")
+        found = by_key.get(item["key"]) or by_title.get(title)
+        if found:
+            numbers[item["key"]] = found
+            print(f"  exists  #{found:<5} {item['key']:<10} {title}")
             continue
         body = render_body(item, items, numbers, milestone_titles)
         if args.dry_run and not created:
@@ -574,6 +754,16 @@ def main() -> int:
             if item["key"] in created and (has_blocks or has_children):
                 gh.edit_body(numbers[item["key"]], render_body(item, items, numbers, milestone_titles))
                 print(f"  updated #{numbers[item['key']]} {item['key']}")
+
+        if args.update:
+            print("\n== Update existing issues from the backlog (--update) ==")
+            for item in items:
+                if item["key"] in created:
+                    continue
+                num = numbers[item["key"]]
+                gh.update_issue(num, issue_title(item), render_body(item, items, numbers, milestone_titles),
+                                labels_for(item), milestone_titles[item["milestone"]], labels_now.get(num, []))
+                print(f"  updated #{num} {item['key']}")
 
         if not args.no_relationships:
             print("\n== GitHub relationships (best-effort) ==")
