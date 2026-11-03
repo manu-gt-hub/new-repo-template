@@ -11,7 +11,14 @@ It asks for your confirmation at each checkpoint.
 
 ## How to use it
 
-Prerequisites on the machine where the agent runs: `git`, `bash` (Git Bash on Windows), Python 3.8+, and the [GitHub CLI](https://cli.github.com) authenticated with `gh auth login`. The target repository must exist (it can be empty).
+Prerequisites:
+
+| Who | Needs |
+|---|---|
+| **Everyone** working on a generated project (coding, lint, tests, commits, docs) | `git`, `bash` (Git Bash on Windows), Python 3.8+ |
+| **Whoever runs the bootstrap**, and maintainers who sync the backlog, apply the ruleset or open PRs from the agent | All of the above **plus** the [GitHub CLI](https://cli.github.com), authenticated with `gh auth login` |
+
+For the bootstrap, the target repository must exist (it can be empty).
 
 Then ask your agent something like:
 
