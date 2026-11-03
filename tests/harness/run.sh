@@ -22,11 +22,12 @@ check() {  # check "<description>" <command...>
 echo "=== Harness self-test ==="
 
 h_section "Required files"
-required="AGENTS.md CLAUDE.md .cursorrules
+required="AGENTS.md CLAUDE.md .cursorrules .github/copilot-instructions.md
 .harness/templates/feature_list.json .harness/templates/claude-progress.md
 .harness/templates/session-handoff.md .harness/templates/clean-state-checklist.md
 .harness/env/sandbox.config .harness/hooks/lib.sh .harness/hooks/pre-agent.sh .harness/hooks/post-agent.sh
 .harness/scripts/create_issues.py .githooks/pre-commit .githooks/commit-msg
+.githooks/post-merge .githooks/post-rewrite
 .github/ISSUE_TEMPLATE/epic.yml .github/ISSUE_TEMPLATE/user-story.yml .github/ISSUE_TEMPLATE/task.yml
 .github/ISSUE_TEMPLATE/bug.yml .github/pull_request_template.md
 docs/project-context/PROJECT_CONTEXT.md docs/project-context/discovery-questionnaire.md
@@ -39,7 +40,7 @@ docs/backlog/index.md docs/process/documentation-guide.md
 .harness/scripts/render_backlog.py .harness/scripts/build_docs.py
 docs-site/index.html docs-site/_headers docs-site/robots.txt
 .github/rulesets/main.json .harness/scripts/apply_ruleset.sh
-.harness/scripts/preflight.sh .github/workflows/docs-pages.yml"
+.harness/scripts/preflight.sh .harness/scripts/verify_bootstrap.sh .github/workflows/docs-pages.yml"
 for f in $required; do check "exists: $f" test -f "$f"; done
 
 h_section "Shell scripts"
@@ -74,6 +75,7 @@ if py="$(h_python)"; then
     check "feature_list state is valid" "$py" tests/harness/validate_json.py feature-list .harness/state/feature_list.json
   fi
   check "backlog example is valid" "$py" .harness/scripts/create_issues.py --backlog docs/resources/templates/backlog.example.json --validate-only
+  check "create_issues unit tests" "$py" tests/harness/test_create_issues.py
   check "create_issues dry-run plans the Kanban board" sh -c "\"\$1\" .harness/scripts/create_issues.py --repo o/r --backlog docs/resources/templates/backlog.example.json --dry-run | grep -q \"project 'Kanban board'\"" _ "$py"
   check "ruleset required checks match CI job names" "$py" tests/harness/validate_json.py ruleset .github/rulesets/main.json .github/workflows/ci.yml
   if [ -f docs/backlog/backlog.json ]; then
@@ -82,6 +84,7 @@ if py="$(h_python)"; then
 
   h_section "Documentation"
   check "generated docs are up to date (run build_docs.py)" "$py" .harness/scripts/build_docs.py --check
+  check "merging two docs branches: no conflict, docs rebuilt" bash tests/harness/test_merge.sh
 else
   h_warn "Python 3 not found: JSON checks skipped"
   fail=$((fail+1))

@@ -1,17 +1,6 @@
-# Cursor rules
+# Cursor rules (legacy file; current Cursor also reads AGENTS.md directly)
 #
-# The canonical rules for every AI agent live in AGENTS.md. Read it before acting.
-# Summary of the non-negotiable rules (AGENTS.md wins on any conflict):
-
-- Read AGENTS.md, docs/project-context/PROJECT_CONTEXT.md and .harness/state/session-handoff.md at the start of every session.
-- If asked to create a new project from this template, follow BOOTSTRAP.md exactly.
-- Do ONLY what the user asked. No unrequested refactors, features, dependencies or reformatting.
-- ALWAYS ask before doing anything that was not explicitly requested. Propose, then wait for a yes.
-- Ask clarifying questions when requirements are ambiguous or incomplete, before writing code.
-- Run lint, format check, type check and tests (commands in .harness/env/sandbox.config) before every commit. Never use --no-verify.
-- Never commit secrets or .env files.
-- Never push to main, force-push or rewrite history unless explicitly asked for that exact action.
-- Confirm before destructive or outward-facing actions (delete, deploy, migrate, create/close issues).
-- One GitHub issue at a time. Check docs/process/definition-of-ready.md before starting and docs/process/definition-of-done.md + .harness/templates/clean-state-checklist.md before calling it done.
-- Never fabricate test results. Report failures with real output.
-- At the end of a session, update .harness/state/claude-progress.md and .harness/state/session-handoff.md.
+# All rules live in AGENTS.md: read it fully before acting. They are not copied here on purpose,
+# so they cannot drift. Cursor does not run the harness hooks automatically, so also:
+#   - at session start: bash .harness/hooks/pre-agent.sh   (read its output)
+#   - at session end:   bash .harness/hooks/post-agent.sh  (report its result)

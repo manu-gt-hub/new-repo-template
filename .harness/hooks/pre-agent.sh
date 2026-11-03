@@ -14,6 +14,20 @@ h_load_config >/dev/null 2>&1 || true
 echo "=== HARNESS PRE-AGENT CHECK ($(date '+%Y-%m-%d %H:%M')) ==="
 echo "Rules: read AGENTS.md. Do only what was asked; ask before anything else; lint+test before commit."
 
+# --- Template maintenance mode: placeholders, missing state and issue-less branches are expected.
+if [ -f BOOTSTRAP.md ]; then
+  h_section "Template maintenance mode (BOOTSTRAP.md present)"
+  h_info "This is the template itself: TODO placeholders and a missing .harness/state/ are intentional."
+  h_info "Keep changes generic; run bash tests/harness/run.sh after changes. Branches: <type>/<slug>; issues optional."
+  [ "$(git config --get core.hooksPath 2>/dev/null)" = ".githooks" ] || h_warn "Git hooks NOT installed. Run: bash docs/resources/templates/init.sh"
+  h_info "Branch: $(h_current_branch)"
+  changes="$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+  [ "$changes" -gt 0 ] && h_warn "$changes uncommitted change(s)" || h_ok "Working tree clean"
+  echo
+  echo "=== Confirm with the user what to change in the template. ==="
+  exit 0
+fi
+
 # --- Initialization -----------------------------------------------------------
 h_section "Initialization"
 initialized=1
@@ -71,6 +85,19 @@ if [ $initialized -eq 1 ]; then
   if [ -f "$HARNESS_STATE/claude-progress.md" ]; then
     # Print the first "## " entry after the '---' separator.
     awk 'f && /^## / {n++} f && n==2 {exit} f && n==1 {print} /^---$/ {f=1}' "$HARNESS_STATE/claude-progress.md" | head -n 30
+  fi
+
+  # --- Status sync (GitHub is the source of truth; read-only on GitHub) ------------
+  if [ "${SYNC_STATUS_ON_START:-1}" = "1" ] && grep -Eq '"issue": *[0-9]' "$HARNESS_STATE/feature_list.json" 2>/dev/null \
+     && py="$(h_python)" && h_gh >/dev/null; then
+    h_section "Status sync with GitHub (issues + Kanban board)"
+    t=""; command -v timeout >/dev/null 2>&1 && t="timeout 30"
+    if out="$($t "$py" .harness/scripts/create_issues.py --sync-status 2>&1)"; then
+      printf '%s\n' "$out" | sed 's/^/  /'
+    else
+      h_warn "Status sync failed (offline or not logged in?); feature_list.json may be stale:"
+      printf '%s\n' "$out" | tail -n 3 | sed 's/^/         /'
+    fi
   fi
 
   # --- Feature status --------------------------------------------------------------

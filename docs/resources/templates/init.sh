@@ -42,6 +42,9 @@ fi
 
 h_section "2. Git hooks"
 git config core.hooksPath .githooks && h_ok "core.hooksPath=.githooks"
+# Generated docs never conflict in merges; the hooks rebuild them (see .gitattributes).
+git config merge.harness-generated.name "keep one side of a generated file; hooks rebuild it"
+git config merge.harness-generated.driver true && h_ok "merge driver for generated docs"
 chmod +x .githooks/* .harness/hooks/*.sh docs/resources/templates/init.sh tests/harness/*.sh 2>/dev/null || true
 h_ok "Scripts marked executable"
 

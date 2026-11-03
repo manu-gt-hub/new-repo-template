@@ -35,7 +35,7 @@ The agent follows [BOOTSTRAP.md](BOOTSTRAP.md).
 ## What's inside
 
 ```
-├── AGENTS.md / CLAUDE.md / .cursorrules   # rules + system map for AI agents
+├── AGENTS.md (+ pointers: CLAUDE.md, .cursorrules, .github/copilot-instructions.md)  # rules + map for AI agents
 ├── BOOTSTRAP.md                           # procedure to create a project from this template
 ├── .claude/settings.json                  # Claude Code hooks + permission guardrails
 ├── .harness/

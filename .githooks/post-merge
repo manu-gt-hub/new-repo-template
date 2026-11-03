@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# .githooks/post-merge — keep generated docs correct after a conflict-free merge.
+# Their merge driver keeps one side unchanged (see .gitattributes), so after a merge commit we
+# rebuild them from the merged docs/ and fold the result into that new, still-local merge commit.
+# Fast-forwards are left alone (no merge commit of ours to touch). Merges that stopped on
+# conflicts are finished with `git commit`, whose pre-commit hook rebuilds the docs instead.
+
+[ "${1:-0}" = "1" ] && exit 0  # squash merge: the following commit's pre-commit handles it
+ROOT="$(git rev-parse --show-toplevel)"
+# shellcheck source=../.harness/hooks/lib.sh
+. "$ROOT/.harness/hooks/lib.sh"
+cd "$ROOT" || exit 0
+[ "$(git rev-list --parents -n 1 HEAD | wc -w)" -gt 2 ] || exit 0  # not a merge commit
+h_regen_docs >/dev/null || exit 0
+git diff --cached --quiet && exit 0
+# `git commit --amend` is refused while git still reports the merge in progress, so rebuild the
+# merge commit with plumbing: same parents, message and author, new tree.
+parents="$(git rev-list --parents -n 1 HEAD | cut -d' ' -f2- | sed 's/[^ ]*/-p &/g')"
+# shellcheck disable=SC2046,SC2086
+if new="$(GIT_AUTHOR_NAME="$(git log -1 --format=%an)" GIT_AUTHOR_EMAIL="$(git log -1 --format=%ae)" \
+          GIT_AUTHOR_DATE="$(git log -1 --format=%aD)" \
+          git log -1 --format=%B | git commit-tree "$(git write-tree)" $parents)" \
+   && git update-ref -m "post-merge: rebuild generated docs" HEAD "$new"; then
+  h_ok "Generated docs rebuilt and added to the merge commit"
+else
+  h_warn "Generated docs are stale after the merge. Run: python .harness/scripts/build_docs.py && git commit -am \"chore(docs): regenerate docs\""
+fi
+exit 0

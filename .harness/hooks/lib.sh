@@ -78,6 +78,22 @@ h_gh() {
   return 1
 }
 
+# Rebuild the generated docs (backlog page + docs-site/) and stage them. Used by the git hooks.
+h_regen_docs() {
+  local py
+  if ! py="$(h_python)"; then
+    h_warn "Python not found: docs-site/ not regenerated (CI will flag it if stale)"
+    return 0
+  fi
+  if "$py" "$HARNESS_ROOT/.harness/scripts/build_docs.py" >/dev/null; then
+    git add "$HARNESS_ROOT/docs/backlog/index.md" "$HARNESS_ROOT/docs-site/"
+    h_ok "Docs regenerated (docs/backlog/index.md, docs-site/) and added to the commit"
+    return 0
+  fi
+  h_fail "Docs generation failed: run python .harness/scripts/build_docs.py to see why"
+  return 1
+}
+
 h_current_branch() { git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"; }
 
 h_is_protected_branch() {

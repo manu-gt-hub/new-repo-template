@@ -8,8 +8,11 @@
 *.ps1 text eol=crlf
 
 # Generated / vendored files: collapsed in GitHub diffs, excluded from language stats.
-docs-site/** linguist-generated=true -diff
-docs/backlog/index.md linguist-generated=true
+docs-site/** linguist-generated=true -diff merge=harness-generated
+docs/backlog/index.md linguist-generated=true merge=harness-generated
+# merge=harness-generated (set up by init.sh): generated files never conflict in a merge; the
+# pre-merge-commit / pre-commit hooks rebuild them from the merged docs/. Without init.sh,
+# git falls back to a normal merge.
 .harness/docs-viewer/vendor/** linguist-vendored=true -diff
 
 *.png binary

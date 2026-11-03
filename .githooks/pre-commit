@@ -26,19 +26,10 @@ if [ "${BLOCK_COMMITS_ON_PROTECTED:-1}" = "1" ] && h_is_protected_branch "$branc
 fi
 
 # Regenerate the documentation (backlog page + docs-site/) when docs or backlog state change,
-# and add the generated files to this commit.
-if git diff --cached --name-only | grep -Eq '^(docs/|\.harness/state/feature_list\.json|\.harness/docs-viewer/|\.harness/scripts/(build_docs|render_backlog)\.py)'; then
-  if py="$(h_python)"; then
-    if "$py" .harness/scripts/build_docs.py >/dev/null; then
-      git add docs/backlog/index.md docs-site/
-      h_ok "Docs regenerated (docs/backlog/index.md, docs-site/) and added to the commit"
-    else
-      h_fail "Docs generation failed: run python .harness/scripts/build_docs.py to see why"
-      rc=1
-    fi
-  else
-    h_warn "Python not found: docs-site/ not regenerated (CI will flag it if stale)"
-  fi
+# and add the generated files to this commit. Always while concluding a merge.
+if [ -f "$(git rev-parse --git-path MERGE_HEAD)" ] || git diff --cached --name-only \
+   | grep -Eq '^(docs/|docs-site/|\.harness/state/feature_list\.json|\.harness/docs-viewer/|\.harness/scripts/(build_docs|render_backlog)\.py)'; then
+  h_regen_docs || rc=1
 fi
 
 h_scan_secrets staged || rc=1
