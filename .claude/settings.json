@@ -35,6 +35,11 @@
       "Bash(gh issue close:*)",
       "Bash(gh pr merge:*)",
       "Bash(gh repo create:*)",
+      "Bash(gh auth login:*)",
+      "Bash(gh auth refresh:*)",
+      "Bash(winget install:*)",
+      "Bash(brew install:*)",
+      "Bash(sudo:*)",
       "Bash(rm -rf:*)"
     ]
   }

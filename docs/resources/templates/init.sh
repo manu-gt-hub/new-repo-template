@@ -27,14 +27,17 @@ echo "=== Harness init: $PROJECT_NAME ==="
 
 h_section "1. Prerequisites"
 for tool in git bash; do
-  if command -v "$tool" >/dev/null 2>&1; then h_ok "$tool found"; else h_fail "$tool not found"; errors=$((errors+1)); fi
+  if command -v "$tool" >/dev/null 2>&1; then h_ok "$tool found"; else h_fail "$tool not found. Install: $(h_install_hint "$tool")"; errors=$((errors+1)); fi
 done
-if py="$(h_python)"; then h_ok "python found ($py)"; else h_fail "Python 3.8+ not found (needed by harness scripts)"; errors=$((errors+1)); fi
-if command -v gh >/dev/null 2>&1; then
-  h_ok "gh found"
-  gh auth status >/dev/null 2>&1 && h_ok "gh authenticated" || h_warn "gh not authenticated (needed for bootstrap, backlog sync to GitHub issues, ruleset and PRs): gh auth login"
+if py="$(h_python)"; then h_ok "python found ($py)"; else h_fail "Python 3.8+ not found (needed by harness scripts). Install: $(h_install_hint python)"; errors=$((errors+1)); fi
+if gh_bin="$(h_gh)"; then
+  h_ok "gh found ($gh_bin)"
+  if ! command -v gh >/dev/null 2>&1; then
+    h_warn "gh is installed but not on PATH. Add it: echo 'export PATH=\"\$PATH:$(dirname "$gh_bin")\"' >> ~/.bashrc  (harness scripts find it anyway)"
+  fi
+  "$gh_bin" auth status >/dev/null 2>&1 && h_ok "gh authenticated" || h_warn "gh not authenticated (needed for bootstrap, backlog sync to GitHub issues, ruleset and PRs): gh auth login"
 else
-  h_warn "gh (GitHub CLI) not found — not needed for daily coding, but required for bootstrap, backlog sync to GitHub issues, ruleset and PRs. https://cli.github.com"
+  h_warn "gh (GitHub CLI) not found: not needed for daily coding, but required for bootstrap, backlog sync to GitHub issues, ruleset and PRs. Install: $(h_install_hint gh)"
 fi
 
 h_section "2. Git hooks"

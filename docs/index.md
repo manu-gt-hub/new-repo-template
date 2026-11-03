@@ -37,6 +37,6 @@ flowchart LR
 
 ## Viewing these docs
 
-- **Online:** open the documentation URL (Cloudflare Pages). Nothing to install.
+- **Online:** open the documentation URL (GitHub Pages or Cloudflare Pages). Nothing to install.
 - **Offline:** open `docs-site/index.html` from the repository (double-click). Nothing to install, no internet needed.
 - **On GitHub:** browse the `docs/` folder; Markdown and diagrams render directly.

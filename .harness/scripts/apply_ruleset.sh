@@ -22,8 +22,9 @@ done
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 # shellcheck source=../hooks/lib.sh
 . "$ROOT/.harness/hooks/lib.sh"
-py="$(h_python)" || { echo "Python 3 is required."; exit 1; }
-command -v gh >/dev/null || { echo "GitHub CLI (gh) is required: https://cli.github.com"; exit 1; }
+py="$(h_python)" || { echo "Python 3.8+ is required. Install: $(h_install_hint python)"; exit 1; }
+GH="$(h_gh)" || { echo "GitHub CLI (gh) is required. Install: $(h_install_hint gh)"; exit 1; }
+gh() { "$GH" "$@"; }
 
 name="$("$py" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["name"])' "$FILE")"
 id="$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name == \"$name\") | .id")"

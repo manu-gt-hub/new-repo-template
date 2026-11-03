@@ -36,6 +36,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -229,16 +230,42 @@ def labels_for(item: dict[str, Any]) -> list[str]:
 
 
 # --------------------------------------------------------------------------- gh helpers
+GH_CANDIDATES = [
+    r"C:\Program Files\GitHub CLI\gh.exe",
+    r"C:\Program Files (x86)\GitHub CLI\gh.exe",
+    os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "GitHub CLI", "gh.exe"),
+    os.path.expanduser(os.path.join("~", "scoop", "shims", "gh.exe")),
+    "/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh",
+]
+
+
+def find_gh() -> str | None:
+    """Locate the GitHub CLI, also when it is installed but not on PATH (HARNESS_GH overrides)."""
+    if os.environ.get("HARNESS_GH"):
+        return os.environ["HARNESS_GH"]
+    return shutil.which("gh") or next((c for c in GH_CANDIDATES if os.path.isfile(c)), None)
+
+
+GH_INSTALL = {
+    "win32": "winget install -e --id GitHub.cli   (then reopen the terminal)",
+    "darwin": "brew install gh",
+}
+
+
 class Gh:
     def __init__(self, repo: str, dry_run: bool) -> None:
         self.repo = repo
         self.dry_run = dry_run
+        self.bin = find_gh() or "gh"
+        if not dry_run and not find_gh():
+            hint = GH_INSTALL.get(sys.platform, "sudo apt install -y gh   (or https://github.com/cli/cli#installation)")
+            raise SystemExit(f"GitHub CLI (gh) not found. Install it: {hint}\nThen run: gh auth login")
 
     def run(self, args: list[str], check: bool = True, mutate: bool = True) -> str:
         if self.dry_run and mutate:
             print("  DRY-RUN gh " + " ".join(a if " " not in a else repr(a) for a in args))
             return ""
-        proc = subprocess.run(["gh", *args], capture_output=True, text=True, encoding="utf-8")
+        proc = subprocess.run([self.bin, *args], capture_output=True, text=True, encoding="utf-8")
         if check and proc.returncode != 0:
             raise RuntimeError(f"gh {' '.join(args)} failed: {proc.stderr.strip()}")
         return proc.stdout.strip() if proc.returncode == 0 else ""
