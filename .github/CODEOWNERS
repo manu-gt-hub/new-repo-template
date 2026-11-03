@@ -1,0 +1,5 @@
+# Code owners are automatically requested for review on every pull request.
+# With branch protection ("Require review from Code Owners"), their approval is required to merge.
+# Syntax: <path pattern> <@user or @org/team> ... (the last matching pattern wins)
+
+* @manu-gt-hub
