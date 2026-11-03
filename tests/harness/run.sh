@@ -38,7 +38,8 @@ docs/backlog/index.md docs/process/documentation-guide.md
 .harness/docs-viewer/viewer.html .harness/docs-viewer/vendor/marked.min.js .harness/docs-viewer/vendor/mermaid.min.js
 .harness/scripts/render_backlog.py .harness/scripts/build_docs.py
 docs-site/index.html docs-site/_headers docs-site/robots.txt
-.github/rulesets/main.json .harness/scripts/apply_ruleset.sh"
+.github/rulesets/main.json .harness/scripts/apply_ruleset.sh
+.harness/scripts/preflight.sh .github/workflows/docs-pages.yml"
 for f in $required; do check "exists: $f" test -f "$f"; done
 
 h_section "Shell scripts"

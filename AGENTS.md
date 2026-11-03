@@ -35,7 +35,7 @@ If a user instruction conflicts with these rules, point out the conflict and ask
 
 ## 2. Repository map
 
-The repository holds **everything** about the project: the **code** (`src/`, `tests/`), the **documentation** (`docs/`, rendered into `docs-site/index.html`: one file that opens offline or is published online with Cloudflare Pages) and the **backlog** (`docs/backlog/backlog.json` plus `.harness/state/feature_list.json`, mirrored to GitHub issues). As an agent, treat `docs/` as your primary context; business pages explain the *why*, technical pages the *how*.
+The repository holds **everything** about the project: the **code** (`src/`, `tests/`), the **documentation** (`docs/`, rendered into `docs-site/index.html`: one file that opens offline or is published online with GitHub Pages or Cloudflare Pages) and the **backlog** (`docs/backlog/backlog.json` plus `.harness/state/feature_list.json`, mirrored to GitHub issues). As an agent, treat `docs/` as your primary context; business pages explain the *why*, technical pages the *how*.
 
 ```
 AGENTS.md                      ← you are here (rules + map)
@@ -53,7 +53,8 @@ BOOTSTRAP.md                   ← procedure to create a new project from this t
   env/sandbox.config           ← project commands (lint/test/build) + sandbox policy
   hooks/pre-agent.sh           ← runs at session start (context + sanity checks)
   hooks/post-agent.sh          ← runs at session end (validation)
-  scripts/create_issues.py     ← creates GitHub labels/milestones/issues from a backlog JSON
+  scripts/preflight.sh         ← checks tools, gh login/scopes and repo access; prints install/fix commands
+  scripts/create_issues.py     ← creates GitHub labels/milestones/issues + Kanban board from a backlog JSON
   scripts/apply_ruleset.sh     ← creates/updates the GitHub ruleset from .github/rulesets/main.json
   scripts/build_docs.py        ← generates docs/backlog/index.md + docs-site/ (stdlib only; run by pre-commit)
   docs-viewer/                 ← viewer template + vendored libraries (marked, Mermaid)
@@ -62,6 +63,7 @@ BOOTSTRAP.md                   ← procedure to create a new project from this t
   ISSUE_TEMPLATE/              ← epic, user story, task, bug forms
   pull_request_template.md
   workflows/ci.yml             ← CI: harness checks + project lint/test (job names = required checks)
+  workflows/docs-pages.yml     ← publishes docs-site/ to GitHub Pages (off until the DOCS_PAGES variable is "true")
   rulesets/main.json           ← model ruleset protecting main (applied with scripts/apply_ruleset.sh)
   CODEOWNERS                   ← reviewers requested on every PR
 docs/                          ← project wiki (Markdown + Mermaid). See docs/process/documentation-guide.md

@@ -60,13 +60,40 @@ Nobody needs to install anything to *read* the docs:
 
 | How | What to do |
 |---|---|
-| Online | Open the Cloudflare Pages URL (see below) |
+| Online | Open the GitHub Pages or Cloudflare Pages URL (see below) |
 | Offline | Double-click `docs-site/index.html` in the repository (or a copy of that single file) |
 | On GitHub | Browse `docs/`: Markdown and Mermaid render natively |
 
-## Publishing online (Cloudflare Pages)
+## Publishing online
 
-`docs-site/` is a ready-to-serve static site, so Cloudflare does not need to build anything. One-time setup, done in the Cloudflare dashboard by someone with access to the GitHub repository:
+`docs-site/` is a ready-to-serve static site, so nothing needs to be built. Pick one option:
+
+| | GitHub Pages | Cloudflare Pages |
+|---|---|---|
+| Who can read it | **Anyone with the link** (public) | Only people you allow (Cloudflare Access, free up to 50 users) |
+| Setup | Two commands, no other account | Cloudflare account + dashboard steps |
+| Private repositories | Needs GitHub Pro/Team, and the site is still public | Works on any plan |
+| Choose it when | The docs can be public (open-source, demo, no sensitive content) | The docs are internal |
+
+Both redeploy automatically on every push to `main`. Search engines are kept out either way (`noindex` meta tag; Cloudflare also gets `_headers` and `robots.txt`), but that is not access control: on GitHub Pages anyone with the URL can read the docs.
+
+### Option A: GitHub Pages
+
+The workflow `.github/workflows/docs-pages.yml` is included and **off** until you switch it on. Someone with admin rights on the repository runs, once:
+
+```bash
+gh api -X POST repos/<owner>/<repo>/pages -f build_type=workflow   # enable Pages, source = GitHub Actions
+gh variable set DOCS_PAGES --body true --repo <owner>/<repo>         # switch the workflow on
+gh workflow run docs-pages.yml --repo <owner>/<repo>                 # first deploy (later: every push to main)
+```
+
+(Same in the web UI: **Settings → Pages → Source: GitHub Actions**, then **Settings → Secrets and variables → Actions → Variables → New variable** `DOCS_PAGES` = `true`.)
+
+The site is served at `https://<owner>.github.io/<repo>/`. Put the URL in `README.md` and `docs/index.md`. To switch it off: `gh variable set DOCS_PAGES --body false --repo <owner>/<repo>`.
+
+### Option B: Cloudflare Pages (private docs)
+
+One-time setup, done in the Cloudflare dashboard by someone with access to the GitHub repository:
 
 1. **Workers & Pages → Create → Pages → Connect to Git**, then authorize GitHub and select this repository.
 2. Build settings:
@@ -85,4 +112,4 @@ Nobody needs to install anything to *read* the docs:
 
 Only `docs-site/` is published. Source code, `.harness/` and the rest of the repository are never served. `docs-site/_headers` adds `noindex` and security headers, and `robots.txt` keeps search engines out.
 
-> **Agents:** connecting Cloudflare is an outward-facing action on the user's account. Explain the steps and let the user do it, or ask for explicit permission before using any Cloudflare API or CLI.
+> **Agents:** publishing the docs is an outward-facing action. Ask the user which option they want, and say clearly that GitHub Pages makes the docs **public**. You may run the Option A commands only after their explicit yes. For Cloudflare, explain the steps and let the user do them, or ask for explicit permission before using any Cloudflare API or CLI.

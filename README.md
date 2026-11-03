@@ -22,6 +22,8 @@ Prerequisites:
 
 For the bootstrap, the target repository must exist (it can be empty).
 
+You do not need to check any of this by hand. The agent's first step is `bash .harness/scripts/preflight.sh <owner/repo>`, which tells you what is missing and the exact command to install or fix it on your OS (Windows, macOS or Linux). The agent offers to run those commands for you, and lists the few manual steps of the whole process up front.
+
 Then ask your agent something like:
 
 > I want to build a project that does X and Y. It will have a UI, user management, etc.
@@ -41,11 +43,12 @@ The agent follows [BOOTSTRAP.md](BOOTSTRAP.md).
 │   │                                      # session-handoff.md, clean-state-checklist.md
 │   ├── env/sandbox.config                 # lint/test/build commands + sandbox policy
 │   ├── hooks/pre-agent.sh, post-agent.sh  # session start / end checks
-│   └── scripts/create_issues.py           # backlog JSON → labels, milestones, issues
+│   ├── scripts/preflight.sh               # machine/GitHub readiness check with install hints
+│   └── scripts/create_issues.py           # backlog JSON → labels, milestones, issues, Kanban board
 ├── .githooks/pre-commit, commit-msg       # lint + secrets before commit, Conventional Commits
 ├── .github/ISSUE_TEMPLATE/                # epic, user story, task, bug forms
 ├── .github/workflows/ci.yml               # harness self-test + configured checks
-├── docs-site/                            # GENERATED docs site: one index.html (offline or Cloudflare Pages)
+├── docs-site/                            # GENERATED docs site: one index.html (offline, GitHub Pages or Cloudflare)
 ├── docs/                                  # project wiki: Markdown, for humans and AI agents
 │   ├── index.md                           # home: where to start per audience
 │   ├── business/                          # plain-language overview, user journeys, roles, roadmap, glossary
@@ -63,7 +66,10 @@ Every generated project includes a documentation site. Business people get flowc
 
 Readers install nothing:
 
-- **Online:** connect the repository to **Cloudflare Pages** (build command: *none*, output directory: `docs-site`). Every push to `main` updates the site, and access can be restricted to your company with Cloudflare Access. Steps are in [documentation-guide.md](docs/process/documentation-guide.md#publishing-online-cloudflare-pages).
+- **Online, public:** **GitHub Pages**. The workflow is included and off by default; two commands switch it on. Anyone with the link can read the site.
+- **Online, private:** **Cloudflare Pages** (build command: *none*, output directory: `docs-site`), with access restricted to your company through Cloudflare Access (free up to 50 users).
+- Either way every push to `main` updates the site. Steps are in [documentation-guide.md](docs/process/documentation-guide.md#publishing-online).
+- **On GitHub:** browse `docs/`; Markdown and Mermaid diagrams render natively. (The repository's built-in *Wiki* tab is not used: it lives outside the repo, is not reviewed in PRs and agents cannot read it.)
 - **Offline:** double-click `docs-site/index.html`.
 
 `docs-site/` is generated from `docs/` by `.harness/scripts/build_docs.py` (Python standard library only), and the pre-commit hook regenerates it automatically. It includes navigation, search, Mermaid diagrams and light/dark themes, and everything is embedded, so no CDN or internet is needed.

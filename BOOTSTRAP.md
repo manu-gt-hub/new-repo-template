@@ -21,19 +21,36 @@ Collect and verify:
 | Default branch of target | no | Assume `main`. |
 | Artifact language | no | **English**, unless the user explicitly asks for another language. Docs, backlog, issues, commits and code all use it. Writing to you in Spanish (or any language) is **not** a request to change it; if in doubt, ask. Record the choice in PROJECT_CONTEXT. |
 
-Preflight checks (run them, report failures, stop if any blocks):
+### Preflight
+
+Get the template (reused in Phase 3) and run the preflight script. It needs only `git` and `bash`:
 
 ```bash
-git --version
-gh --version && gh auth status          # GitHub CLI installed and authenticated; scopes must include `project`
-                                        # (for the Kanban board). If missing: gh auth refresh -s project
-python3 --version || python --version   # used by .harness/scripts/create_issues.py
-gh repo view <owner>/<new-repo> --json name,defaultBranchRef,isEmpty,viewerPermission
+WORK=$(mktemp -d)
+git clone <template-url> "$WORK/template"
+bash "$WORK/template/.harness/scripts/preflight.sh" <owner>/<new-repo>
 ```
 
-- `viewerPermission` must be `ADMIN`, `MAINTAIN` or `WRITE`. `ADMIN` is needed to apply the ruleset in Phase 5.
-- Check for existing branch protection: `gh api repos/<owner>/<new-repo>/rules/branches/main`. If it is not empty (`[]`), the bootstrap pushes to `main` will be rejected. Ask the user whether to disable it temporarily (Phase 5 re-applies the model ruleset) or to deliver the scaffold through a pull request instead.
-- If the target repo is **not empty**, tell the user what is there and ask whether to merge the harness into it or abort. Never overwrite existing files without explicit permission.
+It checks git, Python 3.8+, the GitHub CLI (also when it is installed but not on `PATH`), the login, the token scopes (`repo`, `workflow`, `project`) and your access to the target repository. For anything missing it prints the exact install or fix command for this OS (for example `winget install -e --id GitHub.cli`, `brew install gh`, `gh auth refresh -s project`). The harness scripts find `gh` even when it is not on `PATH`.
+
+- **Exit 1 (blockers):** show the user the list of fixes the script printed. **Offer to run them for them** (installing software and `gh auth` changes need their explicit yes; `gh auth login`/`refresh` open a browser, so the user completes them). After installing, the terminal may need to be reopened. Re-run the preflight until it says `READY`. Do not continue with blockers.
+- **Warnings:**
+  - *Permission WRITE/MAINTAIN:* fine, but the ruleset in Phase 5 needs ADMIN.
+  - *Branch already protected:* bootstrap pushes to `main` will be rejected. Ask the user whether to disable the protection temporarily (Phase 5 re-applies the model ruleset) or to deliver the scaffold through a pull request instead.
+  - *Repository not empty:* tell the user what is there and ask whether to merge the harness into it or abort. Never overwrite existing files without explicit permission.
+  - *Repository not found:* ask before creating it (`gh repo create <owner>/<new-repo> --private`).
+
+### Tell the user what is manual, before starting
+
+Show this list right after the preflight, so nothing surprises them later. Everything else is automated.
+
+| When | Manual step | Why |
+|---|---|---|
+| Now, if the preflight asks | Install Python / `gh`, run `gh auth login` or `gh auth refresh -s project` | Logins open a browser; installing needs their consent |
+| Phase 4, ~1 min | In the Kanban board: **Workflows → Auto-add to project** → on, filter `is:issue` | GitHub has no API for it; without it, issues created later are not added to the board automatically |
+| Phase 5, optional | Publish the docs site: **GitHub Pages** (the agent can switch it on with one command, public site) or **Cloudflare Pages** (dashboard steps, can be private) | Outward-facing; needs their choice and account |
+| Phase 5, if the project needs them | Add CI secrets (Settings → Secrets and variables → Actions) | Agents never handle secret values |
+| Only on **private** repos with a free plan | Nothing to do, but the ruleset and GitHub Pages are unavailable (need GitHub Pro/Team); `main` stays unprotected and docs go to Cloudflare or offline | Plan limitation |
 
 ---
 
@@ -90,9 +107,8 @@ Show the user: the backlog as a table (key, type, title, estimate, depends on, m
 ## Phase 3 — Scaffold the target repository
 
 ```bash
-WORK=$(mktemp -d)
-git clone <template-url> "$WORK/template"
-git clone <target-url>   "$WORK/target"
+# $WORK/template was cloned in Phase 0
+git clone <target-url> "$WORK/target"
 ```
 
 Copy everything from the template **except**:
@@ -165,12 +181,12 @@ Then, inside `$WORK/target`:
    **Checkpoint 5:** after confirmation, run it without `--dry-run`. Also set `.github/CODEOWNERS` to the project owner(s) (ask; default: the user). If the API answers 403/404 on a private repo, rulesets need GitHub Pro/Team: tell the user and skip.
 3. Report to the user:
    - target repo URL and commit SHA(s),
-   - how to view the documentation: double-click `docs-site/index.html`, or publish it online with Cloudflare Pages (steps in `docs/process/documentation-guide.md`, section *Publishing online*). Offer to walk the user through it; do not create cloud resources without explicit permission,
+   - how to view the documentation: double-click `docs-site/index.html`, or publish it online (`docs/process/documentation-guide.md`, section *Publishing online*). Ask which option they want: **GitHub Pages** (public; you can switch it on with its two commands after their yes) or **Cloudflare Pages** (private; walk them through it). Do not publish anything without explicit permission,
    - number of issues/milestones created with links,
    - assumptions that still need validation,
    - suggested first issue to start with,
    - whether the ruleset was applied (link to `https://github.com/<owner>/<new-repo>/rules`),
-   - optional manual steps (secrets in CI, Cloudflare Pages for the docs).
+   - the remaining manual steps from the Phase 0 list (auto-add workflow on the board, CI secrets, docs publishing if not done).
 4. Delete `$WORK` only after the user confirms everything is in place.
 
 ---

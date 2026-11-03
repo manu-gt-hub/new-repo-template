@@ -36,6 +36,48 @@ h_python() {
   return 1
 }
 
+# Operating system family: windows | macos | linux | unknown.
+h_os() {
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*) echo windows ;;
+    Darwin) echo macos ;;
+    Linux) echo linux ;;
+    *) echo unknown ;;
+  esac
+}
+
+# Print the install command for a tool (python | gh | git) on this OS.
+h_install_hint() {
+  local tool="$1" os
+  os="$(h_os)"
+  case "$tool:$os" in
+    python:windows) echo "winget install -e --id Python.Python.3.12   (then reopen the terminal; if 'python' opens the Microsoft Store, disable it in Settings > Apps > Advanced app settings > App execution aliases)" ;;
+    python:macos)   echo "brew install python" ;;
+    python:linux)   echo "sudo apt install -y python3   (Fedora: sudo dnf install -y python3)" ;;
+    gh:windows)     echo "winget install -e --id GitHub.cli   (then reopen the terminal and run: gh auth login)" ;;
+    gh:macos)       echo "brew install gh   (then: gh auth login)" ;;
+    gh:linux)       echo "sudo apt install -y gh   (Fedora: sudo dnf install -y gh; other distros: https://github.com/cli/cli#installation), then: gh auth login" ;;
+    git:windows)    echo "winget install -e --id Git.Git   (includes Git Bash)" ;;
+    git:macos)      echo "xcode-select --install   (or: brew install git)" ;;
+    git:linux)      echo "sudo apt install -y git   (Fedora: sudo dnf install -y git)" ;;
+    *)              echo "see the official install page for $tool" ;;
+  esac
+}
+
+# Find the GitHub CLI even when it is installed but not on PATH (common in Git Bash on Windows
+# right after installing). Prints the path to use; returns 1 if it is not installed.
+# HARNESS_GH overrides the lookup.
+h_gh() {
+  local c
+  for c in "${HARNESS_GH:-}" "$(command -v gh 2>/dev/null)" \
+           "/c/Program Files/GitHub CLI/gh.exe" "/c/Program Files (x86)/GitHub CLI/gh.exe" \
+           "${LOCALAPPDATA:+$(cygpath -u "$LOCALAPPDATA" 2>/dev/null)/Programs/GitHub CLI/gh.exe}" \
+           "$HOME/scoop/shims/gh.exe" /opt/homebrew/bin/gh /usr/local/bin/gh /usr/bin/gh; do
+    if [ -n "$c" ] && [ -x "$c" ]; then echo "$c"; return 0; fi
+  done
+  return 1
+}
+
 h_current_branch() { git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"; }
 
 h_is_protected_branch() {
