@@ -6,7 +6,7 @@
 #   PROJECT_NAME="my-app" bash docs/resources/templates/init.sh
 #
 # What it does (idempotent — safe to re-run):
-#   1. Checks prerequisites (git, bash, python3; gh optional).
+#   1. Checks prerequisites (git, bash, python3; gh only for bootstrap/maintainers).
 #   2. Installs git hooks (core.hooksPath=.githooks) and makes scripts executable.
 #   3. Creates .harness/state/ from .harness/templates/ if missing (never overwrites).
 #   4. Creates a local .env from .env.example if present and .env is missing.
@@ -32,9 +32,9 @@ done
 if py="$(h_python)"; then h_ok "python found ($py)"; else h_fail "Python 3.8+ not found (needed by harness scripts)"; errors=$((errors+1)); fi
 if command -v gh >/dev/null 2>&1; then
   h_ok "gh found"
-  gh auth status >/dev/null 2>&1 && h_ok "gh authenticated" || h_warn "gh not authenticated (needed only to create issues): gh auth login"
+  gh auth status >/dev/null 2>&1 && h_ok "gh authenticated" || h_warn "gh not authenticated (needed for bootstrap, backlog sync to GitHub issues, ruleset and PRs): gh auth login"
 else
-  h_warn "gh (GitHub CLI) not found — needed only to create issues. https://cli.github.com"
+  h_warn "gh (GitHub CLI) not found — not needed for daily coding, but required for bootstrap, backlog sync to GitHub issues, ruleset and PRs. https://cli.github.com"
 fi
 
 h_section "2. Git hooks"

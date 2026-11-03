@@ -19,17 +19,20 @@ Collect and verify:
 | Target repository URL | yes | Must exist and you must have push access. If it does not exist, **ask** before creating it (`gh repo create`). |
 | Template repository URL | yes | This repository. |
 | Default branch of target | no | Assume `main`. |
+| Artifact language | no | **English**, unless the user explicitly asks for another language. Docs, backlog, issues, commits and code all use it. Writing to you in Spanish (or any language) is **not** a request to change it; if in doubt, ask. Record the choice in PROJECT_CONTEXT. |
 
 Preflight checks (run them, report failures, stop if any blocks):
 
 ```bash
 git --version
-gh --version && gh auth status          # GitHub CLI must be installed and authenticated
+gh --version && gh auth status          # GitHub CLI installed and authenticated; scopes must include `project`
+                                        # (for the Kanban board). If missing: gh auth refresh -s project
 python3 --version || python --version   # used by .harness/scripts/create_issues.py
 gh repo view <owner>/<new-repo> --json name,defaultBranchRef,isEmpty,viewerPermission
 ```
 
-- `viewerPermission` must be `ADMIN`, `MAINTAIN` or `WRITE`.
+- `viewerPermission` must be `ADMIN`, `MAINTAIN` or `WRITE`. `ADMIN` is needed to apply the ruleset in Phase 5.
+- Check for existing branch protection: `gh api repos/<owner>/<new-repo>/rules/branches/main`. If it is not empty (`[]`), the bootstrap pushes to `main` will be rejected. Ask the user whether to disable it temporarily (Phase 5 re-applies the model ruleset) or to deliver the scaffold through a pull request instead.
 - If the target repo is **not empty**, tell the user what is there and ask whether to merge the harness into it or abort. Never overwrite existing files without explicit permission.
 
 ---
@@ -144,7 +147,9 @@ Then, inside `$WORK/target`:
    - creates issues in dependency order with the work-item body structure,
    - links dependencies (`Depends on #N` in the body and, when the API is available, GitHub "blocked by" relationships),
    - links stories to their epic (task list in the epic body + sub-issues when available),
-   - writes a mapping `key → issue number` to `--out` (default `issue-map.json`).
+   - writes a mapping `key → issue number` to `--out` (default `issue-map.json`),
+   - creates a GitHub Project named **Kanban board** (`--project-title` to rename it), links it to the repo so it shows in the **Projects** tab, adds every backlog issue (new ones in the **Todo** column) and adds a **Board** view with one column per Status. If it exits with code 2, the issues are fine but the board failed (usually the missing `project` scope): fix it and re-run, nothing is duplicated.
+   Tell the user one manual step: in the project, **Workflows → Auto-add to project** (filter `is:issue`) so issues created later are added automatically. GitHub does not expose this through the API.
    Pass `--write-feature-list .harness/state/feature_list.json` so the feature list gets the issue numbers, then run `python .harness/scripts/build_docs.py` so the docs link to the issues.
 4. Commit with `HARNESS_ALLOW_PROTECTED_COMMIT=1 git commit -m "chore: link feature list to GitHub issues"` and push to `main`. The Checkpoint 3 authorization covers this; tell the user.
 
@@ -153,14 +158,20 @@ Then, inside `$WORK/target`:
 ## Phase 5 — Handoff
 
 1. Append the bootstrap entry to `.harness/state/claude-progress.md` and write `.harness/state/session-handoff.md` (next recommended issue, open questions, assumptions to validate). Commit and push them together with the step 4 commit if possible.
-2. Report to the user:
+2. **Protect `main` with the model ruleset**, the last step because from now on `main` only accepts pull requests. Show the user what `.github/rulesets/main.json` enforces: no deletion, no force-push, PR required (0 approvals, Code Owners review), and the CI checks `Harness self-test…` and `Lint, test, build` required with the branch up to date. Ask whether to adjust it, then run a dry run.
+   ```bash
+   bash .harness/scripts/apply_ruleset.sh <owner>/<new-repo> --dry-run
+   ```
+   **Checkpoint 5:** after confirmation, run it without `--dry-run`. Also set `.github/CODEOWNERS` to the project owner(s) (ask; default: the user). If the API answers 403/404 on a private repo, rulesets need GitHub Pro/Team: tell the user and skip.
+3. Report to the user:
    - target repo URL and commit SHA(s),
    - how to view the documentation: double-click `docs-site/index.html`, or publish it online with Cloudflare Pages (steps in `docs/process/documentation-guide.md`, section *Publishing online*). Offer to walk the user through it; do not create cloud resources without explicit permission,
    - number of issues/milestones created with links,
    - assumptions that still need validation,
    - suggested first issue to start with,
-   - optional manual steps (branch protection on `main`, enabling the repo as a GitHub template, secrets in CI).
-3. Delete `$WORK` only after the user confirms everything is in place.
+   - whether the ruleset was applied (link to `https://github.com/<owner>/<new-repo>/rules`),
+   - optional manual steps (secrets in CI, Cloudflare Pages for the docs).
+4. Delete `$WORK` only after the user confirms everything is in place.
 
 ---
 

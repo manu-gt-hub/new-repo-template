@@ -22,7 +22,13 @@ Examples:
     python .harness/scripts/create_issues.py --repo owner/name --backlog backlog.json \
         --out issue-map.json --write-feature-list .harness/state/feature_list.json
 
-Idempotent: issues whose exact title already exists in the repo are reused, not duplicated.
+After the issues, it creates (or reuses) a GitHub Project board named "Kanban board", links it
+to the repo (Projects tab), adds every backlog issue (new ones in the Todo column) and adds a
+Board view with one column per Status. This needs the token scope `project`
+(`gh auth refresh -s project`). Use --project-title to rename it, or --no-project to skip it.
+
+Idempotent: issues whose exact title already exists in the repo are reused, not duplicated;
+the project, its items and the view are reused too, so re-running adds only what is missing.
 """
 from __future__ import annotations
 
@@ -307,6 +313,122 @@ class Gh:
             print(f"  warn: could not add #{child} as sub-issue of #{parent}: {exc}")
             return False
 
+    # ---- GitHub Projects (board linked to the repo). Needs the token scope `project`.
+    def owner_info(self) -> tuple[str, str, str]:
+        """Return (login, 'User'|'Organization', numeric id) of the repo owner."""
+        login = self.repo.split("/")[0]
+        out = self.run(["api", f"users/{login}", "--jq", '"\\(.type) \\(.id)"'], mutate=False)
+        kind, _, uid = out.partition(" ")
+        return login, kind or "User", uid
+
+    def find_project(self, owner: str, title: str) -> dict[str, Any] | None:
+        out = self.run(["project", "list", "--owner", owner, "--limit", "200", "--format", "json"], mutate=False)
+        for p in json.loads(out or "{}").get("projects", []):
+            if p.get("title") == title:
+                return p
+        return None
+
+    def ensure_project(self, owner: str, title: str) -> dict[str, Any]:
+        found = self.find_project(owner, title)
+        if found:
+            print(f"  project exists: #{found['number']} {title}")
+            return found
+        out = self.run(["project", "create", "--owner", owner, "--title", title, "--format", "json"])
+        print(f"  project created: {title}")
+        return json.loads(out)
+
+    def project_api_bases(self, owner: str, kind: str, uid: str) -> list[str]:
+        if kind == "Organization":
+            return [f"orgs/{owner}"]
+        return [f"users/{uid}", f"users/{owner}"] if uid else [f"users/{owner}"]
+
+    def project_rest(self, bases: list[str], path: str, extra: list[str], mutate: bool) -> str:
+        """Call a Projects REST endpoint, trying each owner path form until one works."""
+        last: Exception | None = None
+        for base in bases:
+            try:
+                return self.run(["api", "-H", "X-GitHub-Api-Version: 2026-03-10",
+                                 f"{base}/projectsV2/{path}", *extra], mutate=mutate)
+            except RuntimeError as exc:
+                last = exc
+        raise RuntimeError(str(last))
+
+    def ensure_board_view(self, owner: str, kind: str, uid: str, number: int, name: str) -> None:
+        """Add a Board view grouped by Status (columns), unless a view with that name exists."""
+        node = "organization" if kind == "Organization" else "user"
+        query = (f"query($login:String!,$n:Int!){{{node}(login:$login){{projectV2(number:$n)"
+                 "{views(first:50){nodes{name}}}}}}")
+        out = self.run(["api", "graphql", "-f", f"query={query}", "-F", f"login={owner}",
+                        "-F", f"n={number}", "--jq", f".data.{node}.projectV2.views.nodes[].name"], mutate=False)
+        if name in out.splitlines():
+            print(f"  view exists: {name}")
+            return
+        bases = self.project_api_bases(owner, kind, uid)
+        fields = json.loads(self.project_rest(bases, f"{number}/fields", [], mutate=False) or "[]")
+        status = next((f["id"] for f in fields if f.get("name") == "Status"), None)
+        body = {"name": name, "layout": "board"}
+        if status is not None:
+            body["vertical_group_by"] = [status]
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json", encoding="utf-8") as fh:
+            json.dump(body, fh)
+            path = fh.name
+        try:
+            self.project_rest(bases, f"{number}/views", ["-X", "POST", "--input", path], mutate=True)
+        finally:
+            os.unlink(path)
+        print(f"  board view created: {name} (columns = Status)")
+
+    def status_todo(self, owner: str, number: int) -> tuple[str, str] | None:
+        """Return (field id, option id) of Status = Todo, if the project has it."""
+        out = self.run(["project", "field-list", str(number), "--owner", owner, "--format", "json"], mutate=False)
+        for f in json.loads(out or "{}").get("fields", []):
+            if f.get("name") == "Status":
+                for o in f.get("options", []):
+                    if o.get("name", "").lower() in ("todo", "to do"):
+                        return f["id"], o["id"]
+        return None
+
+    def add_to_project(self, owner: str, number: int, issue: int) -> str:
+        out = self.run(["project", "item-add", str(number), "--owner", owner, "--url",
+                        f"https://github.com/{self.repo}/issues/{issue}", "--format", "json"])
+        return json.loads(out).get("id", "") if out else ""
+
+    def setup_project(self, title: str, view: str, numbers: dict[str, int], new_keys: list[str]) -> bool:
+        """Create (or reuse) a project, link it to the repo, add every backlog issue and a Board view.
+        Issues created in this run start in the Todo column; existing items keep their status."""
+        if self.dry_run:
+            owner = self.repo.split("/")[0]
+            print(f"  DRY-RUN create or reuse project '{title}' (owner {owner}) and link it to {self.repo}")
+            print(f"  DRY-RUN add {len(numbers)} issues; new ones get Status = Todo")
+            print(f"  DRY-RUN add a '{view}' view (board layout, columns = Status)")
+            return True
+        try:
+            owner, kind, uid = self.owner_info()
+            project = self.ensure_project(owner, title)
+            num, pid = int(project["number"]), project["id"]
+            try:
+                self.run(["project", "link", str(num), "--owner", owner, "--repo", self.repo.split("/")[1]])
+                print(f"  linked to {self.repo}")
+            except RuntimeError as exc:  # already linked, or not permitted
+                print(f"  warn: could not link the project to {self.repo}: {exc}")
+            todo = self.status_todo(owner, num)
+            for key, issue in numbers.items():
+                item = self.add_to_project(owner, num, issue)
+                if todo and item and key in new_keys:
+                    self.run(["project", "item-edit", "--id", item, "--project-id", pid,
+                              "--field-id", todo[0], "--single-select-option-id", todo[1]])
+            print(f"  {len(numbers)} issues in the project")
+            try:
+                self.ensure_board_view(owner, kind, uid, num, view)
+            except RuntimeError as exc:
+                print(f"  warn: could not create the '{view}' view, add it by hand (New view > Board): {exc}")
+            print(f"  project URL: {project.get('url', '')}")
+            return True
+        except (RuntimeError, ValueError, KeyError) as exc:
+            print(f"  ERROR: project NOT set up: {exc}")
+            print("  If the error mentions scopes, run: gh auth refresh -s project   (then re-run this script)")
+            return False
+
 
 # --------------------------------------------------------------------------- feature list
 def write_feature_list(path: str, backlog: dict[str, Any], numbers: dict[str, int]) -> None:
@@ -356,6 +478,10 @@ def main() -> int:
     ap.add_argument("--out", default="issue-map.json", help="where to write the key -> issue number map")
     ap.add_argument("--write-feature-list", metavar="PATH", help="write/update a harness feature_list.json")
     ap.add_argument("--no-relationships", action="store_true", help="skip GitHub 'blocked by' and sub-issue links")
+    ap.add_argument("--project-title", default="Kanban board",
+                    help="GitHub Project (board) to create or reuse, linked to the repo (default: %(default)s)")
+    ap.add_argument("--project-view", default="Board", help="name of the board view (default: %(default)s)")
+    ap.add_argument("--no-project", action="store_true", help="do not create/update the GitHub Project")
     args = ap.parse_args()
 
     with open(args.backlog, encoding="utf-8") as fh:
@@ -439,8 +565,16 @@ def main() -> int:
         if args.write_feature_list:
             write_feature_list(args.write_feature_list, backlog, numbers)
 
+    project_ok = True
+    if not args.no_project:
+        print("\n== GitHub Project (board) ==")
+        project_ok = gh.setup_project(args.project_title, args.project_view, numbers, created)
+
     verb = "would be created" if args.dry_run else "created"
     print(f"\nDone. {len(created)} {verb}, {len(items) - len(created)} already existed.")
+    if not project_ok:
+        print("Issues are fine, but the project board was NOT set up (see the error above).")
+        return 2
     return 0
 
 

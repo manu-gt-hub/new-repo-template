@@ -5,13 +5,22 @@ A **project template with an agent harness** for AI-assisted development. Instea
 1. **Interviews you** about anything missing: data hosting, scalability, security, cost control, access control, user interface, and so on.
 2. **Plans** the project: project context, architecture, ADRs, and a backlog of epics, stories and tasks that meet the Definition of Ready.
 3. **Scaffolds** the new repository on `main` with rules, harness, hooks, CI and DoR/DoD. It also writes a **project wiki**: business docs in plain language with flowcharts, architecture, and the backlog. The wiki is viewable as a pretty offline site and doubles as AI context. The resulting repo holds **code + documentation + backlog** together.
-4. **Creates the GitHub issues** with description, acceptance criteria, checklist, dependencies, estimation and how-to-test, plus labels and milestones.
+4. **Creates the GitHub issues** with description, acceptance criteria, checklist, dependencies, estimation and how-to-test, plus labels and milestones, and a **Kanban board** (GitHub Project) linked to the repo with every issue on it.
+
+Everything the agent writes (docs, backlog, issues, commits, code) is in **English** unless you explicitly ask for another language.
 
 It asks for your confirmation at each checkpoint.
 
 ## How to use it
 
-Prerequisites on the machine where the agent runs: `git`, `bash` (Git Bash on Windows), Python 3.8+, and the [GitHub CLI](https://cli.github.com) authenticated with `gh auth login`. The target repository must exist (it can be empty).
+Prerequisites:
+
+| Who | Needs |
+|---|---|
+| **Everyone** working on a generated project (coding, lint, tests, commits, docs) | `git`, `bash` (Git Bash on Windows), Python 3.8+ |
+| **Whoever runs the bootstrap**, and maintainers who sync the backlog, apply the ruleset or open PRs from the agent | All of the above **plus** the [GitHub CLI](https://cli.github.com), authenticated with `gh auth login` and the `project` scope (`gh auth refresh -s project`, needed for the Kanban board) |
+
+For the bootstrap, the target repository must exist (it can be empty).
 
 Then ask your agent something like:
 
@@ -75,6 +84,7 @@ Everything is meant to be adapted in the generated repository:
 - [Definition of Ready](docs/process/definition-of-ready.md) and [Definition of Done](docs/process/definition-of-done.md). Record changes in their changelog.
 - Project-specific agent rules: [AGENTS.md section 5](AGENTS.md#5-project-specific-rules).
 - Commands and policies: [.harness/env/sandbox.config](.harness/env/sandbox.config).
+- Protection of `main`: [.github/rulesets/main.json](.github/rulesets/main.json), a model ruleset (PR required, no force-push or deletion, CI checks required). Bootstrap applies it to the new repository with `bash .harness/scripts/apply_ruleset.sh <owner/repo>`. If you rename a CI job, update the ruleset too; the self-test checks that they match.
 
 ## Maintaining the template
 

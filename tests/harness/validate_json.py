@@ -2,6 +2,7 @@
 
 Usage:
     python tests/harness/validate_json.py feature-list <path>
+    python tests/harness/validate_json.py ruleset .github/rulesets/main.json .github/workflows/ci.yml
 
 Exit code 0 when valid; prints the problems and exits 1 otherwise.
 """
@@ -73,7 +74,33 @@ def validate_feature_list(data: dict) -> list[str]:
     return errors
 
 
+def validate_ruleset(ruleset_path: str, ci_path: str) -> list[str]:
+    """The ruleset must be well-formed and every required status check must be a CI job name.
+
+    A required check that no job produces blocks every pull request forever ("Expected").
+    """
+    import re
+
+    with open(ruleset_path, encoding="utf-8") as fh:
+        ruleset = json.load(fh)
+    with open(ci_path, encoding="utf-8") as fh:
+        jobs = set(re.findall(r"^    name:\s*(.+?)\s*$", fh.read(), re.M))
+    errors = [f"missing '{k}'" for k in ("name", "target", "enforcement", "rules") if k not in ruleset]
+    for rule in ruleset.get("rules", []):
+        if rule.get("type") != "required_status_checks":
+            continue
+        for chk in rule.get("parameters", {}).get("required_status_checks", []):
+            if chk.get("context") not in jobs:
+                errors.append(f"required check '{chk.get('context')}' is not a job name in {ci_path} (jobs: {sorted(jobs)})")
+    return errors
+
+
 def main() -> int:
+    if len(sys.argv) == 4 and sys.argv[1] == "ruleset":
+        errors = validate_ruleset(sys.argv[2], sys.argv[3])
+        for err in errors:
+            print(f"  - {err}")
+        return 1 if errors else 0
     if len(sys.argv) != 3 or sys.argv[1] != "feature-list":
         print(__doc__)
         return 2
