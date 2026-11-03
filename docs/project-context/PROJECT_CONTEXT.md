@@ -34,6 +34,7 @@
 | Personas | TODO | |
 | Design system / component library | TODO | |
 | Languages / i18n | TODO | |
+| Artifact language (docs, backlog, issues, commits, code) | English | Default (AGENTS.md rule 11). Change only if the user explicitly asks. |
 | Accessibility target | TODO | |
 | Supported devices / browsers | TODO | |
 

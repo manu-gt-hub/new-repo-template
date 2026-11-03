@@ -19,12 +19,14 @@ Collect and verify:
 | Target repository URL | yes | Must exist and you must have push access. If it does not exist, **ask** before creating it (`gh repo create`). |
 | Template repository URL | yes | This repository. |
 | Default branch of target | no | Assume `main`. |
+| Artifact language | no | **English**, unless the user explicitly asks for another language. Docs, backlog, issues, commits and code all use it. Writing to you in Spanish (or any language) is **not** a request to change it; if in doubt, ask. Record the choice in PROJECT_CONTEXT. |
 
 Preflight checks (run them, report failures, stop if any blocks):
 
 ```bash
 git --version
-gh --version && gh auth status          # GitHub CLI must be installed and authenticated
+gh --version && gh auth status          # GitHub CLI installed and authenticated; scopes must include `project`
+                                        # (for the Kanban board). If missing: gh auth refresh -s project
 python3 --version || python --version   # used by .harness/scripts/create_issues.py
 gh repo view <owner>/<new-repo> --json name,defaultBranchRef,isEmpty,viewerPermission
 ```
@@ -145,7 +147,9 @@ Then, inside `$WORK/target`:
    - creates issues in dependency order with the work-item body structure,
    - links dependencies (`Depends on #N` in the body and, when the API is available, GitHub "blocked by" relationships),
    - links stories to their epic (task list in the epic body + sub-issues when available),
-   - writes a mapping `key → issue number` to `--out` (default `issue-map.json`).
+   - writes a mapping `key → issue number` to `--out` (default `issue-map.json`),
+   - creates a GitHub Project named **Kanban board** (`--project-title` to rename it), links it to the repo so it shows in the **Projects** tab, adds every backlog issue (new ones in the **Todo** column) and adds a **Board** view with one column per Status. If it exits with code 2, the issues are fine but the board failed (usually the missing `project` scope): fix it and re-run, nothing is duplicated.
+   Tell the user one manual step: in the project, **Workflows → Auto-add to project** (filter `is:issue`) so issues created later are added automatically. GitHub does not expose this through the API.
    Pass `--write-feature-list .harness/state/feature_list.json` so the feature list gets the issue numbers, then run `python .harness/scripts/build_docs.py` so the docs link to the issues.
 4. Commit with `HARNESS_ALLOW_PROTECTED_COMMIT=1 git commit -m "chore: link feature list to GitHub issues"` and push to `main`. The Checkpoint 3 authorization covers this; tell the user.
 

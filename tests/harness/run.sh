@@ -73,6 +73,7 @@ if py="$(h_python)"; then
     check "feature_list state is valid" "$py" tests/harness/validate_json.py feature-list .harness/state/feature_list.json
   fi
   check "backlog example is valid" "$py" .harness/scripts/create_issues.py --backlog docs/resources/templates/backlog.example.json --validate-only
+  check "create_issues dry-run plans the Kanban board" sh -c "\"\$1\" .harness/scripts/create_issues.py --repo o/r --backlog docs/resources/templates/backlog.example.json --dry-run | grep -q \"project 'Kanban board'\"" _ "$py"
   check "ruleset required checks match CI job names" "$py" tests/harness/validate_json.py ruleset .github/rulesets/main.json .github/workflows/ci.yml
   if [ -f docs/backlog/backlog.json ]; then
     check "project backlog is valid" "$py" .harness/scripts/create_issues.py --backlog docs/backlog/backlog.json --validate-only

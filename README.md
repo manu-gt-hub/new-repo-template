@@ -5,7 +5,9 @@ A **project template with an agent harness** for AI-assisted development. Instea
 1. **Interviews you** about anything missing: data hosting, scalability, security, cost control, access control, user interface, and so on.
 2. **Plans** the project: project context, architecture, ADRs, and a backlog of epics, stories and tasks that meet the Definition of Ready.
 3. **Scaffolds** the new repository on `main` with rules, harness, hooks, CI and DoR/DoD. It also writes a **project wiki**: business docs in plain language with flowcharts, architecture, and the backlog. The wiki is viewable as a pretty offline site and doubles as AI context. The resulting repo holds **code + documentation + backlog** together.
-4. **Creates the GitHub issues** with description, acceptance criteria, checklist, dependencies, estimation and how-to-test, plus labels and milestones.
+4. **Creates the GitHub issues** with description, acceptance criteria, checklist, dependencies, estimation and how-to-test, plus labels and milestones, and a **Kanban board** (GitHub Project) linked to the repo with every issue on it.
+
+Everything the agent writes (docs, backlog, issues, commits, code) is in **English** unless you explicitly ask for another language.
 
 It asks for your confirmation at each checkpoint.
 
@@ -16,7 +18,7 @@ Prerequisites:
 | Who | Needs |
 |---|---|
 | **Everyone** working on a generated project (coding, lint, tests, commits, docs) | `git`, `bash` (Git Bash on Windows), Python 3.8+ |
-| **Whoever runs the bootstrap**, and maintainers who sync the backlog, apply the ruleset or open PRs from the agent | All of the above **plus** the [GitHub CLI](https://cli.github.com), authenticated with `gh auth login` |
+| **Whoever runs the bootstrap**, and maintainers who sync the backlog, apply the ruleset or open PRs from the agent | All of the above **plus** the [GitHub CLI](https://cli.github.com), authenticated with `gh auth login` and the `project` scope (`gh auth refresh -s project`, needed for the Kanban board) |
 
 For the bootstrap, the target repository must exist (it can be empty).
 

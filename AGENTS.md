@@ -27,6 +27,7 @@ This file is the **single source of truth** for how any AI agent (Claude Code, C
 8. **One work item at a time.** Every change maps to a GitHub issue. Check the [Definition of Ready](docs/process/definition-of-ready.md) before starting and the [Definition of Done](docs/process/definition-of-done.md) + [clean-state checklist](.harness/templates/clean-state-checklist.md) before declaring it done.
 9. **Never fabricate results.** If a test fails, a command errors or a step was skipped, say so with the actual output. "Done" means verified.
 10. **Leave a trail.** Update the progress log and session handoff (section 4) at the end of every session.
+11. **Everything written to the repository or GitHub is in English** (docs, backlog, issues, PRs, commit messages, code, comments), unless the user explicitly asks for another language. The language the user chats in does **not** count as that request: you may reply in their language, but the artifacts stay in English. If the project chose another language, it is recorded in [PROJECT_CONTEXT.md](docs/project-context/PROJECT_CONTEXT.md) and applies from then on.
 
 If a user instruction conflicts with these rules, point out the conflict and ask how to proceed.
 
