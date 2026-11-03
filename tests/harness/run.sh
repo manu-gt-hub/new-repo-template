@@ -10,6 +10,10 @@ cd "$ROOT" || exit 1
 . "$ROOT/.harness/hooks/lib.sh"
 
 pass=0; fail=0
+# True when the file contains no carriage return. Runs in this bash process (not "sh", which is
+# dash on Ubuntu and does not support $'\r'). -U stops Git-for-Windows grep from stripping CRs.
+no_crlf() { ! grep -qU $'\r' "$1"; }
+
 check() {  # check "<description>" <command...>
   local desc="$1"; shift
   if "$@" >/dev/null 2>&1; then pass=$((pass+1)); h_ok "$desc"; else fail=$((fail+1)); h_fail "$desc"; fi
@@ -39,7 +43,7 @@ for f in $required; do check "exists: $f" test -f "$f"; done
 h_section "Shell scripts"
 for f in .harness/hooks/*.sh .githooks/* docs/resources/templates/init.sh tests/harness/*.sh; do
   check "bash syntax: $f" bash -n "$f"
-  check "LF line endings: $f" sh -c "! grep -q \$'\r' '$f'"
+  check "LF line endings: $f" no_crlf "$f"
 done
 
 h_section "Configuration"
