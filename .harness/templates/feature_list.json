@@ -1,0 +1,30 @@
+{
+  "$comment": "Global state of features and milestones. Live copy: .harness/state/feature_list.json. status: todo | in_progress | blocked | in_review | done. issue: GitHub issue number or null.",
+  "schema_version": 1,
+  "project": "{{PROJECT_NAME}}",
+  "updated_at": "{{DATE}}",
+  "milestones": [
+    {
+      "key": "M0",
+      "title": "M0 Foundations",
+      "description": "Tooling, CI, environments and skeleton needed before feature work.",
+      "due_on": null,
+      "status": "todo"
+    }
+  ],
+  "features": [
+    {
+      "key": "EXAMPLE-001",
+      "type": "story",
+      "title": "Example feature - replace during bootstrap",
+      "milestone": "M0",
+      "parent": null,
+      "issue": null,
+      "status": "todo",
+      "estimate": 1,
+      "depends_on": [],
+      "tests": [],
+      "notes": ""
+    }
+  ]
+}

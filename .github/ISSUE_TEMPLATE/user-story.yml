@@ -1,0 +1,83 @@
+name: User story
+description: User-visible value that fits in one iteration.
+title: "[Story] "
+labels: ["type:story"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: "As a <persona>, I want <capability>, so that <benefit>. Add context and motivation."
+      value: |
+        As a ..., I want ..., so that ...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable statements, preferably Given / When / Then.
+      value: |
+        - [ ] Given ..., when ..., then ...
+    validations:
+      required: true
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Checklist
+      value: |
+        - [ ] Implementation
+        - [ ] Unit / integration tests
+        - [ ] UI states covered (empty, loading, error, success)
+        - [ ] Docs updated
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Issues that must be done first, issues this blocks, external dependencies.
+      value: |
+        - Depends on: none
+        - Blocks: none
+        - External: none
+    validations:
+      required: true
+  - type: dropdown
+    id: estimate
+    attributes:
+      label: Estimation (story points)
+      options: ["1 (XS)", "2 (S)", "3 (M)", "5 (L)", "8 (XL)", "13 (XXL - must be split)"]
+    validations:
+      required: true
+  - type: textarea
+    id: how_to_test
+    attributes:
+      label: How to test
+      description: Automated tests to add/run and manual verification steps.
+      value: |
+        1. Automated:
+        2. Manual:
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+  - type: textarea
+    id: security
+    attributes:
+      label: Security / access
+      description: Which roles can do this? Data sensitivity?
+  - type: input
+    id: parent
+    attributes:
+      label: Parent epic
+      placeholder: "#123"
+  - type: checkboxes
+    id: dor
+    attributes:
+      label: Definition of Ready
+      options:
+        - label: This story meets the Definition of Ready (docs/process/definition-of-ready.md)
+          required: true

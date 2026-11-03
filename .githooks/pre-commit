@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit — installed by docs/resources/templates/init.sh (git config core.hooksPath .githooks)
+#
+# Blocks the commit when:
+#   - committing on a protected branch (unless HARNESS_ALLOW_PROTECTED_COMMIT=1 for that one commit)
+#   - staged changes contain secrets or forbidden files
+#   - lint / format check / type check fail (and tests, if PRE_COMMIT_RUN_TESTS=1)
+# Never bypass with --no-verify (see AGENTS.md golden rule 4).
+
+set -u
+ROOT="$(git rev-parse --show-toplevel)"
+# shellcheck source=../.harness/hooks/lib.sh
+. "$ROOT/.harness/hooks/lib.sh"
+cd "$ROOT" || exit 1
+h_load_config || { echo "pre-commit: sandbox.config missing, aborting."; exit 1; }
+
+echo "== pre-commit =="
+rc=0
+
+branch="$(h_current_branch)"
+if [ "${BLOCK_COMMITS_ON_PROTECTED:-1}" = "1" ] && h_is_protected_branch "$branch" \
+   && [ "${HARNESS_ALLOW_PROTECTED_COMMIT:-0}" != "1" ]; then
+  h_fail "Commits on protected branch '$branch' are blocked. Create a feature branch."
+  h_info "If the user explicitly asked to commit here: HARNESS_ALLOW_PROTECTED_COMMIT=1 git commit ..."
+  exit 1
+fi
+
+# Regenerate the documentation (backlog page + docs-site/) when docs or backlog state change,
+# and add the generated files to this commit.
+if git diff --cached --name-only | grep -Eq '^(docs/|\.harness/state/feature_list\.json|\.harness/docs-viewer/|\.harness/scripts/(build_docs|render_backlog)\.py)'; then
+  if py="$(h_python)"; then
+    if "$py" .harness/scripts/build_docs.py >/dev/null; then
+      git add docs/backlog/index.md docs-site/
+      h_ok "Docs regenerated (docs/backlog/index.md, docs-site/) and added to the commit"
+    else
+      h_fail "Docs generation failed: run python .harness/scripts/build_docs.py to see why"
+      rc=1
+    fi
+  else
+    h_warn "Python not found: docs-site/ not regenerated (CI will flag it if stale)"
+  fi
+fi
+
+h_scan_secrets staged || rc=1
+h_check_forbidden_paths staged || rc=1
+h_run_check "Lint" "${LINT_CMD:-}" || rc=1
+h_run_check "Format check" "${FORMAT_CHECK_CMD:-}" || rc=1
+h_run_check "Type check" "${TYPECHECK_CMD:-}" || rc=1
+if [ "${PRE_COMMIT_RUN_TESTS:-0}" = "1" ]; then
+  h_run_check "Tests" "${TEST_CMD:-}" || rc=1
+fi
+
+if [ $rc -ne 0 ]; then
+  echo "pre-commit: FAILED. Fix the issues above; do not bypass the hook."
+  exit 1
+fi
+echo "pre-commit: OK"
+exit 0

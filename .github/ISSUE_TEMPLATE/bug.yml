@@ -1,0 +1,76 @@
+name: Bug
+description: Defect in existing behaviour.
+title: "[Bug] "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: Expected vs actual behaviour
+      value: |
+        **Expected:**
+        **Actual:**
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment / version
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options: ["critical", "high", "medium", "low"]
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] The bug no longer reproduces with the steps above
+        - [ ] A regression test covers it
+    validations:
+      required: true
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Checklist
+      value: |
+        - [ ] Root cause identified
+        - [ ] Fix implemented
+        - [ ] Regression test added
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+  - type: dropdown
+    id: estimate
+    attributes:
+      label: Estimation (story points)
+      options: ["1 (XS)", "2 (S)", "3 (M)", "5 (L)", "8 (XL)"]
+    validations:
+      required: true
+  - type: textarea
+    id: how_to_test
+    attributes:
+      label: How to test
+    validations:
+      required: true

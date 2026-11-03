@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# .githooks/commit-msg — enforces Conventional Commits when ENFORCE_CONVENTIONAL_COMMITS=1.
+# Format: <type>(<optional scope>)!: <description> (#<issue>)
+# Example: feat(auth): add login form (#42)
+
+set -u
+ROOT="$(git rev-parse --show-toplevel)"
+# shellcheck source=../.harness/hooks/lib.sh
+. "$ROOT/.harness/hooks/lib.sh"
+h_load_config >/dev/null 2>&1 || true
+
+[ "${ENFORCE_CONVENTIONAL_COMMITS:-1}" = "1" ] || exit 0
+
+first_line="$(grep -v '^#' "$1" | head -n 1)"
+case "$first_line" in
+  Merge\ *|Revert\ *|fixup!\ *|squash!\ *) exit 0 ;;
+esac
+
+pattern='^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-z0-9._/-]+\))?!?: .+'
+if ! printf '%s' "$first_line" | grep -Eq "$pattern"; then
+  echo "commit-msg: message does not follow Conventional Commits:"
+  echo "  '$first_line'"
+  echo "  expected: <type>(<scope>): <description> (#<issue>)"
+  echo "  types: feat fix chore docs style refactor perf test build ci revert"
+  exit 1
+fi
+if [ ${#first_line} -gt 100 ]; then
+  echo "commit-msg: subject line longer than 100 characters."
+  exit 1
+fi
+exit 0
