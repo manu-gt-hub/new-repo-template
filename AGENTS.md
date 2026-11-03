@@ -53,13 +53,16 @@ BOOTSTRAP.md                   ← procedure to create a new project from this t
   hooks/pre-agent.sh           ← runs at session start (context + sanity checks)
   hooks/post-agent.sh          ← runs at session end (validation)
   scripts/create_issues.py     ← creates GitHub labels/milestones/issues from a backlog JSON
+  scripts/apply_ruleset.sh     ← creates/updates the GitHub ruleset from .github/rulesets/main.json
   scripts/build_docs.py        ← generates docs/backlog/index.md + docs-site/ (stdlib only; run by pre-commit)
   docs-viewer/                 ← viewer template + vendored libraries (marked, Mermaid)
 .githooks/                     ← git hooks (pre-commit lint/secrets, commit-msg format)
 .github/
   ISSUE_TEMPLATE/              ← epic, user story, task, bug forms
   pull_request_template.md
-  workflows/ci.yml             ← CI: harness checks + project lint/test
+  workflows/ci.yml             ← CI: harness checks + project lint/test (job names = required checks)
+  rulesets/main.json           ← model ruleset protecting main (applied with scripts/apply_ruleset.sh)
+  CODEOWNERS                   ← reviewers requested on every PR
 docs/                          ← project wiki (Markdown + Mermaid). See docs/process/documentation-guide.md
   index.md                     ← home page: where to start for each audience
   business/                    ← PLAIN LANGUAGE for non-technical readers

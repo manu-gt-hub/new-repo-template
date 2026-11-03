@@ -37,11 +37,12 @@ docs/business/roles-and-permissions.md docs/business/roadmap.md docs/business/gl
 docs/backlog/index.md docs/process/documentation-guide.md
 .harness/docs-viewer/viewer.html .harness/docs-viewer/vendor/marked.min.js .harness/docs-viewer/vendor/mermaid.min.js
 .harness/scripts/render_backlog.py .harness/scripts/build_docs.py
-docs-site/index.html docs-site/_headers docs-site/robots.txt"
+docs-site/index.html docs-site/_headers docs-site/robots.txt
+.github/rulesets/main.json .harness/scripts/apply_ruleset.sh"
 for f in $required; do check "exists: $f" test -f "$f"; done
 
 h_section "Shell scripts"
-for f in .harness/hooks/*.sh .githooks/* docs/resources/templates/init.sh tests/harness/*.sh; do
+for f in .harness/hooks/*.sh .harness/scripts/*.sh .githooks/* docs/resources/templates/init.sh tests/harness/*.sh; do
   check "bash syntax: $f" bash -n "$f"
   check "LF line endings: $f" no_crlf "$f"
 done
@@ -72,6 +73,7 @@ if py="$(h_python)"; then
     check "feature_list state is valid" "$py" tests/harness/validate_json.py feature-list .harness/state/feature_list.json
   fi
   check "backlog example is valid" "$py" .harness/scripts/create_issues.py --backlog docs/resources/templates/backlog.example.json --validate-only
+  check "ruleset required checks match CI job names" "$py" tests/harness/validate_json.py ruleset .github/rulesets/main.json .github/workflows/ci.yml
   if [ -f docs/backlog/backlog.json ]; then
     check "project backlog is valid" "$py" .harness/scripts/create_issues.py --backlog docs/backlog/backlog.json --validate-only
   fi

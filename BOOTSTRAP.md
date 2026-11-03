@@ -29,7 +29,8 @@ python3 --version || python --version   # used by .harness/scripts/create_issues
 gh repo view <owner>/<new-repo> --json name,defaultBranchRef,isEmpty,viewerPermission
 ```
 
-- `viewerPermission` must be `ADMIN`, `MAINTAIN` or `WRITE`.
+- `viewerPermission` must be `ADMIN`, `MAINTAIN` or `WRITE`. `ADMIN` is needed to apply the ruleset in Phase 5.
+- Check for existing branch protection: `gh api repos/<owner>/<new-repo>/rules/branches/main`. If it is not empty (`[]`), the bootstrap pushes to `main` will be rejected. Ask the user whether to disable it temporarily (Phase 5 re-applies the model ruleset) or to deliver the scaffold through a pull request instead.
 - If the target repo is **not empty**, tell the user what is there and ask whether to merge the harness into it or abort. Never overwrite existing files without explicit permission.
 
 ---
@@ -153,14 +154,20 @@ Then, inside `$WORK/target`:
 ## Phase 5 — Handoff
 
 1. Append the bootstrap entry to `.harness/state/claude-progress.md` and write `.harness/state/session-handoff.md` (next recommended issue, open questions, assumptions to validate). Commit and push them together with the step 4 commit if possible.
-2. Report to the user:
+2. **Protect `main` with the model ruleset**, the last step because from now on `main` only accepts pull requests. Show the user what `.github/rulesets/main.json` enforces: no deletion, no force-push, PR required (0 approvals, Code Owners review), and the CI checks `Harness self-test…` and `Lint, test, build` required with the branch up to date. Ask whether to adjust it, then run a dry run.
+   ```bash
+   bash .harness/scripts/apply_ruleset.sh <owner>/<new-repo> --dry-run
+   ```
+   **Checkpoint 5:** after confirmation, run it without `--dry-run`. Also set `.github/CODEOWNERS` to the project owner(s) (ask; default: the user). If the API answers 403/404 on a private repo, rulesets need GitHub Pro/Team: tell the user and skip.
+3. Report to the user:
    - target repo URL and commit SHA(s),
    - how to view the documentation: double-click `docs-site/index.html`, or publish it online with Cloudflare Pages (steps in `docs/process/documentation-guide.md`, section *Publishing online*). Offer to walk the user through it; do not create cloud resources without explicit permission,
    - number of issues/milestones created with links,
    - assumptions that still need validation,
    - suggested first issue to start with,
-   - optional manual steps (branch protection on `main`, enabling the repo as a GitHub template, secrets in CI).
-3. Delete `$WORK` only after the user confirms everything is in place.
+   - whether the ruleset was applied (link to `https://github.com/<owner>/<new-repo>/rules`),
+   - optional manual steps (secrets in CI, Cloudflare Pages for the docs).
+4. Delete `$WORK` only after the user confirms everything is in place.
 
 ---
 

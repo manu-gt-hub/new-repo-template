@@ -75,6 +75,7 @@ Everything is meant to be adapted in the generated repository:
 - [Definition of Ready](docs/process/definition-of-ready.md) and [Definition of Done](docs/process/definition-of-done.md). Record changes in their changelog.
 - Project-specific agent rules: [AGENTS.md section 5](AGENTS.md#5-project-specific-rules).
 - Commands and policies: [.harness/env/sandbox.config](.harness/env/sandbox.config).
+- Protection of `main`: [.github/rulesets/main.json](.github/rulesets/main.json), a model ruleset (PR required, no force-push or deletion, CI checks required). Bootstrap applies it to the new repository with `bash .harness/scripts/apply_ruleset.sh <owner/repo>`. If you rename a CI job, update the ruleset too; the self-test checks that they match.
 
 ## Maintaining the template
 
