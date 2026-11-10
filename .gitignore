@@ -8,14 +8,6 @@
 secrets/
 credentials*.json
 
-# Live harness state is committed in generated projects, not in the template.
-# TEMPLATE-ONLY: bootstrap deletes this comment line and the line below it.
-.harness/state/
-
-# Harness scratch files
-issue-map.json
-backlog.local.json
-
 # Claude Code local settings
 .claude/settings.local.json
 
@@ -26,7 +18,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
-# Common build / dependency output (extend for your stack)
+# Build / dependency output (extend for your stack)
 node_modules/
 dist/
 build/
