@@ -1,6 +1,0 @@
-# Cursor rules (legacy file; current Cursor also reads AGENTS.md directly)
-#
-# All rules live in AGENTS.md: read it fully before acting. They are not copied here on purpose,
-# so they cannot drift. Cursor does not run the harness hooks automatically, so also:
-#   - at session start: bash .harness/hooks/pre-agent.sh   (read its output)
-#   - at session end:   bash .harness/hooks/post-agent.sh  (report its result)

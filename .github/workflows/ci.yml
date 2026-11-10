@@ -1,54 +1,14 @@
 name: CI
 
 on:
-  pull_request:
   push:
     branches: [main]
-
-permissions:
-  contents: read
+  pull_request:
 
 jobs:
-  harness:
-    name: Harness self-test (incl. generated docs up to date)
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Run harness self-test
-        run: bash tests/harness/run.sh
-
-  checks:
-    name: Lint, test, build
-    runs-on: ubuntu-latest
-    needs: harness
-    steps:
-      - uses: actions/checkout@v4
-      # TODO(bootstrap): add the toolchain setup for the chosen stack here
-      # (e.g. actions/setup-node, actions/setup-python, actions/setup-go) and dependency install.
-      - name: Run configured checks
-        shell: bash
-        run: |
-          . .harness/env/sandbox.config
-          run() {
-            if [ -z "$2" ]; then echo "::warning::$1 skipped: no command configured in sandbox.config"; return 0; fi
-            echo "::group::$1 ($2)"; bash -c "$2"; status=$?; echo "::endgroup::"; return $status
-          }
-          run "Lint" "$LINT_CMD"
-          run "Format check" "$FORMAT_CHECK_CMD"
-          run "Type check" "$TYPECHECK_CMD"
-          run "Tests" "$TEST_CMD"
-          run "Build" "$BUILD_CMD"
-
-      - name: Secret scan of the pushed changes
-        shell: bash
-        run: |
-          . .harness/env/sandbox.config
-          git fetch --no-tags --depth=50 origin "${GITHUB_BASE_REF:-main}" 2>/dev/null || true
-          base="$(git merge-base HEAD "origin/${GITHUB_BASE_REF:-main}" 2>/dev/null || echo HEAD~1)"
-          if git diff "$base" HEAD -U0 -- . ':(exclude).harness/env/sandbox.config' | grep -E '^\+' | grep -vE '^\+\+\+' | grep -E -- "$SECRET_PATTERNS"; then
-            echo "::error::Possible secrets found in the diff"; exit 1
-          fi
-          echo "No secret patterns found"
+      # Add the toolchain setup for your stack here (actions/setup-node, actions/setup-python…).
+      - run: bash scripts/check.sh

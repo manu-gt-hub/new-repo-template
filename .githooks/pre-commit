@@ -1,49 +1,26 @@
 #!/usr/bin/env bash
-# .githooks/pre-commit — installed by docs/resources/templates/init.sh (git config core.hooksPath .githooks)
-#
-# Blocks the commit when:
-#   - committing on a protected branch (unless HARNESS_ALLOW_PROTECTED_COMMIT=1 for that one commit)
-#   - staged changes contain secrets or forbidden files
-#   - lint / format check / type check fail (and tests, if PRE_COMMIT_RUN_TESTS=1)
-# Never bypass with --no-verify (see AGENTS.md golden rule 4).
-
+# Install once per clone: git config core.hooksPath .githooks
+# Blocks commits on main/master, commits with secrets or secret files, and failing checks.
+# Never bypass with --no-verify.
 set -u
-ROOT="$(git rev-parse --show-toplevel)"
-# shellcheck source=../.harness/hooks/lib.sh
-. "$ROOT/.harness/hooks/lib.sh"
-cd "$ROOT" || exit 1
-h_load_config || { echo "pre-commit: sandbox.config missing, aborting."; exit 1; }
+cd "$(git rev-parse --show-toplevel)" || exit 1
 
-echo "== pre-commit =="
-rc=0
-
-branch="$(h_current_branch)"
-if [ "${BLOCK_COMMITS_ON_PROTECTED:-1}" = "1" ] && h_is_protected_branch "$branch" \
-   && [ "${HARNESS_ALLOW_PROTECTED_COMMIT:-0}" != "1" ]; then
-  h_fail "Commits on protected branch '$branch' are blocked. Create a feature branch."
-  h_info "If the user explicitly asked to commit here: HARNESS_ALLOW_PROTECTED_COMMIT=1 git commit ..."
+branch="$(git rev-parse --abbrev-ref HEAD)"
+if { [ "$branch" = "main" ] || [ "$branch" = "master" ]; } && [ "${ALLOW_MAIN_COMMIT:-0}" != "1" ]; then
+  echo "pre-commit: commits on '$branch' are blocked. Create a branch (or ALLOW_MAIN_COMMIT=1 if explicitly intended)."
   exit 1
 fi
 
-# Regenerate the documentation (backlog page + docs-site/) when docs or backlog state change,
-# and add the generated files to this commit. Always while concluding a merge.
-if [ -f "$(git rev-parse --git-path MERGE_HEAD)" ] || git diff --cached --name-only \
-   | grep -Eq '^(docs/|docs-site/|\.harness/state/feature_list\.json|\.harness/docs-viewer/|\.harness/scripts/(build_docs|render_backlog)\.py)'; then
-  h_regen_docs || rc=1
+files="$(git diff --cached --name-only --diff-filter=ACMR)"
+bad_files="$(printf '%s\n' "$files" | grep -E '(^|/)(\.env(\..*)?|.*\.(pem|key|p12)|credentials.*\.json)$|(^|/)secrets/' | grep -vE '\.(example|sample|template)$' || true)"
+if [ -n "$bad_files" ]; then
+  echo "pre-commit: secret files staged:"; printf '  %s\n' $bad_files; exit 1
 fi
 
-h_scan_secrets staged || rc=1
-h_check_forbidden_paths staged || rc=1
-h_run_check "Lint" "${LINT_CMD:-}" || rc=1
-h_run_check "Format check" "${FORMAT_CHECK_CMD:-}" || rc=1
-h_run_check "Type check" "${TYPECHECK_CMD:-}" || rc=1
-if [ "${PRE_COMMIT_RUN_TESTS:-0}" = "1" ]; then
-  h_run_check "Tests" "${TEST_CMD:-}" || rc=1
+secrets='(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35})'
+hits="$(git diff --cached -U0 --no-color -- . ':(exclude).githooks/pre-commit' | grep -E '^\+[^+]' | grep -nE "$secrets" || true)"
+if [ -n "$hits" ]; then
+  echo "pre-commit: possible secrets in staged changes:"; printf '%s\n' "$hits" | head -n 10; exit 1
 fi
 
-if [ $rc -ne 0 ]; then
-  echo "pre-commit: FAILED. Fix the issues above; do not bypass the hook."
-  exit 1
-fi
-echo "pre-commit: OK"
-exit 0
+SKIP_TESTS=1 bash scripts/check.sh || { echo "pre-commit: checks failed. Fix them; do not bypass the hook."; exit 1; }
