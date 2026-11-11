@@ -1,0 +1,33 @@
+name: Compliance
+
+# Opt-in: set the repository variable COMPLIANCE_ENABLED=true once compliance.yml is
+# filled and manu-gt-hub/compliance-hub exists. Until then every job is skipped.
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"   # weekly re-check against the latest rules (Monday 06:17 UTC)
+  repository_dispatch:
+    types: [compliance-rules-updated]   # sent by compliance-hub when a rule changes
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  profile:
+    if: vars.COMPLIANCE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/compliance-profile-check.sh
+
+  evaluate:
+    if: vars.COMPLIANCE_ENABLED == 'true'
+    needs: profile
+    uses: manu-gt-hub/compliance-hub/.github/workflows/evaluate.yml@v1
+    with:
+      profile: compliance.yml
+    secrets: inherit

@@ -1,0 +1,56 @@
+# Compliance profile of this project.
+#
+# This file describes FACTS about the project, not the law. The legal rules live in
+# manu-gt-hub/compliance-hub and are updated there; this project is re-evaluated
+# automatically when they change. Edit this file only when the PROJECT changes
+# (new kind of data, AI feature, payments, hosting region, client...), in the same PR.
+#
+# Use true | false | unknown for yes/no fields. "unknown" is honest and gets flagged
+# in the report; a wrong "false" silently hides obligations.
+
+schema_version: 1
+reviewed: TODO            # YYYY-MM-DD: last time you confirmed this file matches reality
+
+project:
+  name: TODO
+  client: TODO            # who commissions it ("own" if it is yours)
+  sector: TODO            # generic | energy | health | finance | education | public-sector | ecommerce | other
+  countries: [ES]         # where the users / data subjects are
+
+roles:
+  controller: TODO        # who decides why and how personal data is processed (usually the client)
+  processors: []          # who processes it on their behalf, e.g. [self, aws, openai]
+
+personal_data:
+  processed: TODO
+  categories: []          # contact, identification, location, financial, behavioural, employees, minors
+  special_categories: []  # health, biometric, genetic, ethnic-origin, political, religious, sex-life, union, criminal
+  data_subjects: []       # customers, employees, patients, minors, public
+  large_scale: TODO
+  profiling_or_automated_decisions: TODO
+
+hosting:
+  regions: []             # e.g. [eu-west-1, on-prem-ES]
+  providers: []
+  transfers_outside_eea: TODO
+
+ai:
+  used: TODO
+  role: TODO              # provider (you build/ship the AI system) | deployer (you use it) | none
+  purposes: []            # e.g. chatbot, scoring, recommendation, emotion-recognition, biometric-id
+  models: []              # vendor/model
+  interacts_with_people: TODO
+  generates_content: TODO
+
+product:
+  public_website_or_app: TODO
+  sells_online: TODO                       # consumer / e-commerce rules
+  uses_cookies_or_trackers: TODO
+  essential_or_important_entity: TODO      # NIS2
+  product_with_digital_elements_sold: TODO # Cyber Resilience Act
+
+evaluation:
+  include: ["src/**", "docs/**", "*.md"]
+  exclude: ["**/fixtures/**", "data/**"]
+  send_to_llm: false      # true ONLY if the client contract allows sending code/docs to an LLM API
+  notes: ""

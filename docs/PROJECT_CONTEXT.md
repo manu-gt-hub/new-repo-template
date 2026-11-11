@@ -21,7 +21,8 @@
 - **Security / secrets handling:** TODO
 - **Access control (who can do what):** TODO
 - **Cost limits:** TODO
-- **Other (performance, compliance, UI…):** TODO
+- **Compliance:** see [compliance.yml](../compliance.yml) (must be filled)
+- **Other (performance, UI…):** TODO
 
 ## Decisions
 

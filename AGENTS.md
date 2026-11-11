@@ -15,7 +15,8 @@ If [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) still contains `TODO`, the
 5. **Never push to `main` directly, force-push or rewrite shared history** unless the user explicitly asks.
 6. **Confirm destructive or outward-facing actions** (deleting files/branches/data, deploying, publishing, creating issues or PRs).
 7. **Never fabricate results.** If a check fails or a step was skipped, say so with the real output.
-8. **Write everything in the repo in English** (code, docs, commits), even if the user chats in another language, unless PROJECT_CONTEXT says otherwise.
+8. **Keep [compliance.yml](compliance.yml) true.** If a change adds or alters personal data, special categories (health, biometrics…), AI features, payments, trackers, hosting regions or third parties, update `compliance.yml` in the same PR and say so in the PR description. Never send real personal data or client code to external services unless `evaluation.send_to_llm` is `true`.
+9. **Write everything in the repo in English** (code, docs, commits), even if the user chats in another language, unless PROJECT_CONTEXT says otherwise.
 
 ## Workflow
 
@@ -32,9 +33,12 @@ If [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) still contains `TODO`, the
 AGENTS.md                 rules for agents (this file); CLAUDE.md imports it
 docs/PROJECT_CONTEXT.md   what we build, stack, constraints, decisions
 docs/PROGRESS.md          session log + current state (newest first)
+docs/architecture/        architecture as Markdown + Mermaid (source of truth); slides/ for decks
+compliance.yml            compliance profile: facts about the project, read by compliance-hub
 scripts/check.sh          lint / format / test commands (used by pre-commit and CI)
 .githooks/                pre-commit (secrets + check.sh), commit-msg (Conventional Commits)
 .github/workflows/ci.yml  runs scripts/check.sh on push and PR
+.github/workflows/compliance.yml  opt-in compliance evaluation (PR, weekly, on rule updates)
 ```
 
 ## Project-specific rules
